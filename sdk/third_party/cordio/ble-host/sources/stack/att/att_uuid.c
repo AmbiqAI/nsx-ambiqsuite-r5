@@ -189,3 +189,7 @@ const uint8_t attCteTxDurChUuid[ATT_16_UUID_LEN] = {UINT16_TO_BYTES(ATT_UUID_CTE
 const uint8_t attCteIntChUuid[ATT_16_UUID_LEN] =   {UINT16_TO_BYTES(ATT_UUID_CTE_INTERVAL)};
 const uint8_t attCtePhyChUuid[ATT_16_UUID_LEN] =   {UINT16_TO_BYTES(ATT_UUID_CTE_PHY)};
 const uint8_t attSsfChUuid[ATT_16_UUID_LEN] =      {UINT16_TO_BYTES(ATT_UUID_SERVER_SUPPORTED_FEATURES)};
+#if (BT_54)
+const uint8_t attEdkmChUuid[ATT_16_UUID_LEN] =     {UINT16_TO_BYTES(ATT_UUID_EDKM)};
+const uint8_t attSeclvlChUuid[ATT_16_UUID_LEN] =   {UINT16_TO_BYTES(ATT_UUID_SEC_LEVEL)};
+#endif // BT_54

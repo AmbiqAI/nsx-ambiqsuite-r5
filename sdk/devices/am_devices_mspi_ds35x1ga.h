@@ -2,9 +2,9 @@
 //
 //! @file am_devices_mspi_ds35x1ga.h
 //!
-//! @brief Multibit SPI ds35x1ga NAND flash driver.
+//! @brief Multi-bit SPI NAND Flash driver for the DS35X1GA device.
 //!
-//! @addtogroup mspi_ds35x1ga DX35X1GA MSPI Driver
+//! @addtogroup devices_mspi_ds35x1ga DS35X1GA MSPI NAND Driver
 //! @ingroup devices
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5_2_a_1_1-c2486c8ef of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 

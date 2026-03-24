@@ -8,13 +8,13 @@
  *  Copyright (c) 2016-2018 Arm Ltd. All Rights Reserved.
  *
  *  Copyright (c) 2019-2020 Packetcraft, Inc.
- *  
+ *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
- *  
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- *  
+ *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -890,3 +890,56 @@ void DmSyncInitialRptEnable(bool_t enable)
   }
   WsfTaskUnlock();
 }
+
+#if (BT_53)
+/*************************************************************************************************/
+/*!
+ *  \brief  DM enable or disable initial periodic advertising duplicate filtering once synchronized.
+ *
+ *  \param  enable   TRUE to enable initial duplicate filtering, FALSE to disable duplicate filtering.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmSyncInitialDupFiltEnable(bool_t enable)
+{
+  WsfTaskLock();
+  if (enable)
+  {
+    /* Enable initial periodic advertisement duplicate filtering */
+    dmCb.syncOptions |= HCI_OPTIONS_INIT_DUP_FILT_BIT;
+  }
+  else
+  {
+    /* Disable initial periodic advertisement duplicate filtering */
+    dmCb.syncOptions &= ~HCI_OPTIONS_INIT_DUP_FILT_BIT;
+  }
+  WsfTaskUnlock();
+}
+#endif // BT_53
+
+#if (BT_54)
+/*************************************************************************************************/
+/*!
+ *  \brief  DM set periodic sync subtevent.
+ *
+ *  \param  syncHandle      Identifying the PAwR train.
+ *  \param  perAdvProp      Periodic advertising properties.
+ *  \param  numSubEvents    Number of subevents.
+ *  \param  subEvents       The subevent to synchronize with.
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmSyncSetSubEvt(uint16_t syncHandle, uint16_t perAdvProp, uint8_t numSubEvents, uint8_t * subEvents)
+{
+  hciPerSyncSubEvtSet_t syncSubEvt;
+
+  syncSubEvt.syncHandle = syncHandle;
+  syncSubEvt.perAdvProp = perAdvProp;
+  syncSubEvt.numSubEvents = numSubEvents;
+
+  memcpy(syncSubEvt.subEvents, subEvents, numSubEvents);
+
+  HciLeSetPerSyncSubEvtCmd(&syncSubEvt);
+}
+#endif // BT_54

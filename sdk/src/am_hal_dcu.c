@@ -4,10 +4,43 @@
 //!
 //! @brief Functions for DCU functions
 //!
-//! @addtogroup dcu DCU - Debug Control Unit
-//! @ingroup apollo510_hal
+//! @addtogroup dcu_ap510L DCU - Debug Control Unit
+//! @ingroup apollo510L_hal
 //! @{
-//
+//!
+//! Purpose: This module provides functions for managing the Debug Control Unit
+//! (DCU) which controls debug access and security features on Apollo5 devices.
+//! It handles DCU locking, unlocking, status checking, and configuration for
+//! secure debug operations.
+//!
+//! @section hal_dcu_features Key Features
+//!
+//! 1. @b Debug @b Control: Manage debug access permissions and security.
+//! 2. @b Lock/Unlock: Control DCU locking mechanisms for security.
+//! 3. @b Status @b Monitoring: Check DCU status and configuration.
+//! 4. @b Security @b Management: Handle debug security features.
+//! 5. @b Raw @b Access: Direct access to DCU registers and masks.
+//!
+//! @section hal_dcu_functionality Functionality
+//!
+//! - Lock and unlock DCU for security control
+//! - Read DCU status and configuration
+//! - Manage debug access permissions
+//! - Handle raw DCU register access
+//! - Support for security override operations
+//!
+//! @section hal_dcu_usage Usage
+//!
+//! 1. Check DCU status using am_hal_dcu_get()
+//! 2. Lock/unlock DCU as needed for security
+//! 3. Monitor DCU configuration and status
+//! 4. Handle security overrides when required
+//!
+//! @section hal_dcu_configuration Configuration
+//!
+//! - @b Security @b Level: Configure debug access permissions
+//! - @b Lock @b Masks: Set up DCU locking patterns
+//! - @b Override @b Support: Enable security override features
 //*****************************************************************************
 
 //*****************************************************************************
@@ -44,20 +77,22 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5_2_a_1_1-c2486c8ef of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #include "am_mcu_apollo.h"
 
 #define CRYPTO_CC_IS_IDLE()     while (CRYPTO->HOSTCCISIDLE_b.HOSTCCISIDLE == 0)
 
+//
 // Raw offset for 3b value corresponding to DCU value 1
-uint32_t gStartOff    = 0; // DCU value 1 corresponds to b[2:0]
-uint64_t gDcuMask     = AM_HAL_DCURAW_MASK;
-uint64_t gDcuEnable   = AM_HAL_DCURAW_ENABLE;
-uint64_t gDcuDisable  = AM_HAL_DCURAW_DISABLE;
-volatile uint32_t *gpDcuEnable = &CRYPTO->HOSTDCUEN2;
-volatile uint32_t *gpDcuLock   = &CRYPTO->HOSTDCULOCK2;
+//
+uint32_t gStartOff              = 0;    // DCU value 1 corresponds to b[2:0]
+uint64_t gDcuMask               = AM_HAL_DCURAW_MASK;
+uint64_t gDcuEnable             = AM_HAL_DCURAW_ENABLE;
+uint64_t gDcuDisable            = AM_HAL_DCURAW_DISABLE;
+volatile uint32_t *gpDcuEnable  = &CRYPTO->HOSTDCUEN2;
+volatile uint32_t *gpDcuLock    = &CRYPTO->HOSTDCULOCK2;
 
 typedef union
 {
@@ -122,8 +157,8 @@ get_ui32_dcu_mask(uint64_t ui64DcuMask, uint8_t threeBitVal)
 //! @return Returns AM_HAL_STATUS_SUCCESS on success
 //
 //*****************************************************************************
-static
-uint32_t am_hal_dcu_raw_lock_status_get(uint64_t *pui64Val)
+static uint32_t
+am_hal_dcu_raw_lock_status_get(uint64_t *pui64Val)
 {
     am_hal_64b_dcu_t value;
     value.u32[0] = AM_REGVAL(gpDcuLock);
@@ -143,7 +178,8 @@ uint32_t am_hal_dcu_raw_lock_status_get(uint64_t *pui64Val)
 //! @return Returns AM_HAL_STATUS_SUCCESS on success
 //
 //*****************************************************************************
-uint32_t am_hal_dcu_lock_status_get(uint32_t *pui32Val)
+uint32_t
+am_hal_dcu_lock_status_get(uint32_t *pui32Val)
 {
     uint64_t ui64Lock;
     uint32_t ui32Status;
@@ -155,7 +191,7 @@ uint32_t am_hal_dcu_lock_status_get(uint32_t *pui32Val)
     ui32Status = am_hal_dcu_raw_lock_status_get(&ui64Lock);
     *pui32Val = get_ui32_dcu_mask(ui64Lock, AM_HAL_DCURAWVAL_MASK);
     return ui32Status;
-}
+} // am_hal_dcu_lock_status_get()
 
 //*****************************************************************************
 //
@@ -168,8 +204,8 @@ uint32_t am_hal_dcu_lock_status_get(uint32_t *pui32Val)
 //! @return Returns AM_HAL_STATUS_SUCCESS on success
 //
 //*****************************************************************************
-static
-uint32_t am_hal_dcu_raw_lock(uint64_t ui64Mask)
+static uint32_t
+am_hal_dcu_raw_lock(uint64_t ui64Mask)
 {
     //
     // copy_words((uint32_t *)gpDcuLock, (uint32_t *)&ui64Mask, sizeof(uint64_t) / 4);
@@ -196,7 +232,8 @@ uint32_t am_hal_dcu_raw_lock(uint64_t ui64Mask)
 //! @return Returns AM_HAL_STATUS_SUCCESS on success
 //
 //*****************************************************************************
-uint32_t am_hal_dcu_lock(uint32_t ui32Mask)
+uint32_t
+am_hal_dcu_lock(uint32_t ui32Mask)
 {
     uint64_t ui64Lock;
     if ((PWRCTRL->DEVPWRSTATUS_b.PWRSTCRYPTO == 0) || (CRYPTO->HOSTCCISIDLE_b.HOSTCCISIDLE == 0))
@@ -206,7 +243,7 @@ uint32_t am_hal_dcu_lock(uint32_t ui32Mask)
     }
     ui64Lock = get_raw_dcu_mask(ui32Mask, AM_HAL_DCURAWVAL_MASK);
     return am_hal_dcu_raw_lock(ui64Lock);
-}
+} // am_hal_dcu_lock()
 
 //*****************************************************************************
 //
@@ -219,15 +256,15 @@ uint32_t am_hal_dcu_lock(uint32_t ui32Mask)
 //! @return Returns AM_HAL_STATUS_SUCCESS on success
 //
 //*****************************************************************************
-static
-uint32_t am_hal_dcu_raw_get(uint64_t *pui64Val)
+static uint32_t
+am_hal_dcu_raw_get(uint64_t *pui64Val)
 {
     am_hal_64b_dcu_t value;
     value.u32[0] = AM_REGVAL(gpDcuEnable);
     value.u32[1] = AM_REGVAL(gpDcuEnable + 1);
     *pui64Val = value.u64;
     return AM_HAL_STATUS_SUCCESS;
-}
+} // am_hal_dcu_raw_get()
 
 //*****************************************************************************
 //
@@ -240,7 +277,8 @@ uint32_t am_hal_dcu_raw_get(uint64_t *pui64Val)
 //! @return Returns AM_HAL_STATUS_SUCCESS on success
 //
 //*****************************************************************************
-uint32_t am_hal_dcu_get(uint32_t *pui32Val)
+uint32_t
+am_hal_dcu_get(uint32_t *pui32Val)
 {
     uint64_t ui64Enable;
     uint32_t ui32Status;
@@ -252,7 +290,7 @@ uint32_t am_hal_dcu_get(uint32_t *pui32Val)
     ui32Status = am_hal_dcu_raw_get(&ui64Enable);
     *pui32Val = get_ui32_dcu_mask(ui64Enable, AM_HAL_DCURAWVAL_ENABLE);
     return ui32Status;
-}
+} // am_hal_dcu_get()
 
 //*****************************************************************************
 //
@@ -266,8 +304,8 @@ uint32_t am_hal_dcu_get(uint32_t *pui32Val)
 //! @return Returns AM_HAL_STATUS_SUCCESS on success
 //
 //*****************************************************************************
-static
-uint32_t am_hal_dcu_raw_update(bool bEnable, uint64_t ui64Mask)
+static uint32_t
+am_hal_dcu_raw_update(bool bEnable, uint64_t ui64Mask)
 {
     am_hal_64b_dcu_t dcuVal;
     am_hal_64b_dcu_t dcuLock;
@@ -291,7 +329,7 @@ uint32_t am_hal_dcu_raw_update(bool bEnable, uint64_t ui64Mask)
     AM_REGVAL(gpDcuEnable + 1) = dcuVal.u32[1];
     CRYPTO_CC_IS_IDLE();
     return AM_HAL_STATUS_SUCCESS;
-}
+} // am_hal_dcu_raw_update()
 
 //*****************************************************************************
 //
@@ -300,7 +338,8 @@ uint32_t am_hal_dcu_raw_update(bool bEnable, uint64_t ui64Mask)
 // This will update the DCU Enable settings, if not locked
 //
 //*****************************************************************************
-uint32_t am_hal_dcu_update(bool bEnable, uint32_t ui32Mask)
+uint32_t
+am_hal_dcu_update(bool bEnable, uint32_t ui32Mask)
 {
     uint64_t ui64Mask;
     if ((PWRCTRL->DEVPWRSTATUS_b.PWRSTCRYPTO == 0) || (CRYPTO->HOSTCCISIDLE_b.HOSTCCISIDLE == 0))
@@ -310,7 +349,7 @@ uint32_t am_hal_dcu_update(bool bEnable, uint32_t ui32Mask)
     }
     ui64Mask = get_raw_dcu_mask(ui32Mask, AM_HAL_DCURAWVAL_MASK);
     return am_hal_dcu_raw_update(bEnable, ui64Mask);
-}
+} // am_hal_dcu_update()
 
 //*****************************************************************************
 //
@@ -320,11 +359,56 @@ uint32_t am_hal_dcu_update(bool bEnable, uint32_t ui32Mask)
 // This can only further lock things if the corresponding DCU Enable was open
 //
 //*****************************************************************************
-uint32_t am_hal_dcu_mcuctrl_override(uint32_t ui32Mask)
+uint32_t
+am_hal_dcu_mcuctrl_override(uint32_t ui32Mask)
 {
     MCUCTRL->DEBUGGER = ui32Mask;
     return AM_HAL_STATUS_SUCCESS;
-}
+} // am_hal_dcu_mcuctrl_override()
+
+//*****************************************************************************
+//
+// DCU SWO Enable - Enable SWO
+//
+//*****************************************************************************
+uint32_t
+am_hal_dcu_swo_enable(void)
+{
+    //
+    // Make sure that SWO is enabled
+    //
+    {
+        if ( (PWRCTRL->DEVPWRSTATUS_b.PWRSTCRYPTO == 1) &&
+             (CRYPTO->HOSTCCISIDLE_b.HOSTCCISIDLE == 1) )
+        {
+            uint32_t ui32dcuVal = 0;
+
+            am_hal_dcu_get(&ui32dcuVal);
+
+            //
+            // Enable SWO
+            //
+            if ( ((ui32dcuVal & AM_HAL_DCU_SWO) != AM_HAL_DCU_SWO) &&
+                 (am_hal_dcu_update(true, AM_HAL_DCU_SWO) != AM_HAL_STATUS_SUCCESS) )
+            {
+                //
+                // Cannot enable SWO
+                //
+                return AM_HAL_STATUS_FAIL;
+            }
+        }
+        else
+        {
+            //
+            // If DCU is not accessible, we cannot determine if ITM can be safely enabled.
+            //
+            return AM_HAL_STATUS_FAIL;
+        }
+    }
+
+    return AM_HAL_STATUS_SUCCESS;
+
+} // am_hal_dcu_swo_enable()
 
 
 //*****************************************************************************

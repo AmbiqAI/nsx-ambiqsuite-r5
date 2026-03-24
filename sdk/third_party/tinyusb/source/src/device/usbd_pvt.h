@@ -23,33 +23,36 @@
  *
  * This file is part of the TinyUSB stack.
  */
-#ifndef _TUSB_USBD_PVT_H_
-#define _TUSB_USBD_PVT_H_
+#ifndef TUSB_USBD_PVT_H_
+#define TUSB_USBD_PVT_H_
 
 #include "osal/osal.h"
 #include "common/tusb_fifo.h"
+#include "common/tusb_private.h"
 
 #ifdef __cplusplus
  extern "C" {
 #endif
 
-// Level where CFG_TUSB_DEBUG must be at least for USBD is logged
-#ifndef CFG_TUD_LOG_LEVEL
-#define CFG_TUD_LOG_LEVEL   2
-#endif
-
 #define TU_LOG_USBD(...)   TU_LOG(CFG_TUD_LOG_LEVEL, __VA_ARGS__)
+
+//--------------------------------------------------------------------+
+// MACRO CONSTANT TYPEDEF PROTYPES
+//--------------------------------------------------------------------+
+
+typedef enum {
+  SOF_CONSUMER_USER = 0,
+  SOF_CONSUMER_AUDIO,
+} sof_consumer_t;
 
 //--------------------------------------------------------------------+
 // Class Driver API
 //--------------------------------------------------------------------+
 
 typedef struct {
-  #if CFG_TUSB_DEBUG >= CFG_TUD_LOG_LEVEL
   char const* name;
-  #endif
-
   void     (* init             ) (void);
+  bool     (* deinit           ) (void);
   void     (* reset            ) (uint8_t rhport);
   uint16_t (* open             ) (uint8_t rhport, tusb_desc_interface_t const * desc_intf, uint16_t max_len);
   bool     (* control_xfer_cb  ) (uint8_t rhport, uint8_t stage, tusb_control_request_t const * request);
@@ -78,7 +81,7 @@ bool usbd_edpt_open(uint8_t rhport, tusb_desc_endpoint_t const * desc_ep);
 void usbd_edpt_close(uint8_t rhport, uint8_t ep_addr);
 
 // Submit a usb transfer
-#if defined(AM_PART_APOLLO510)
+#ifdef AMBIQ_TUSB_CHANGE
 bool usbd_edpt_xfer(uint8_t rhport, uint8_t ep_addr, uint8_t * buffer, uint32_t total_bytes);
 #else
 bool usbd_edpt_xfer(uint8_t rhport, uint8_t ep_addr, uint8_t * buffer, uint16_t total_bytes);
@@ -119,7 +122,7 @@ bool usbd_edpt_ready(uint8_t rhport, uint8_t ep_addr) {
 }
 
 // Enable SOF interrupt
-void usbd_sof_enable(uint8_t rhport, bool en);
+void usbd_sof_enable(uint8_t rhport, sof_consumer_t consumer, bool en);
 
 /*------------------------------------------------------------------*/
 /* Helper
@@ -127,6 +130,11 @@ void usbd_sof_enable(uint8_t rhport, bool en);
 
 bool usbd_open_edpt_pair(uint8_t rhport, uint8_t const* p_desc, uint8_t ep_count, uint8_t xfer_type, uint8_t* ep_out, uint8_t* ep_in);
 void usbd_defer_func(osal_task_func_t func, void *param, bool in_isr);
+
+
+#if CFG_TUSB_DEBUG >= CFG_TUD_LOG_LEVEL
+void usbd_driver_print_control_complete_name(usbd_control_xfer_cb_t callback);
+#endif
 
 #ifdef __cplusplus
  }

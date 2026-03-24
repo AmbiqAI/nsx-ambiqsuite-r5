@@ -40,7 +40,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision stable-e194c59112 of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5_2_a_1_1-c2486c8ef of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef RTOS_H
@@ -73,4 +73,3 @@ extern void run_tasks(void);
 #endif
 
 #endif // RTOS_H
-

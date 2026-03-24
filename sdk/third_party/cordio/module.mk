@@ -1,5 +1,5 @@
 # local_src := $(wildcard $(subdirectory)/ble-host/sources/hci/ambiq/*.c)
-# local_src += $(wildcard $(subdirectory)/ble-host/sources/hci/ambiq/em9305/*.c)
+# local_src += $(wildcard $(subdirectory)/ble-host/sources/hci/ambiq/510L_radio/*.c)
 # local_src += $(wildcard $(subdirectory)/ble-host/sources/sec/common/*.c)
 # local_src += $(wildcard $(subdirectory)/ble-host/sources/sec/uecc/*.c)
 # local_src += $(wildcard $(subdirectory)/ble-host/sources/stack/att/*.c)
@@ -36,7 +36,7 @@ includes_api += $(subdirectory)/wsf/sources/util
 includes_api += $(subdirectory)/ble-host/include
 includes_api += $(subdirectory)/ble-host/sources/stack/cfg
 includes_api += $(subdirectory)/ble-host/sources/hci/ambiq
-includes_api += $(subdirectory)/ble-host/sources/hci/ambiq/em9305
+includes_api += $(subdirectory)/ble-host/sources/hci/ambiq/510L_radio
 includes_api += $(subdirectory)/ble-host/sources/stack/hci/
 includes_api += $(subdirectory)/ble-host/sources/stack/smp/
 includes_api += $(subdirectory)/ble-host/sources/stack/dm/
@@ -46,9 +46,11 @@ includes_api += $(subdirectory)/ble-host/sources/sec/common/
 includes_api += $(subdirectory)/../uecc
 includes_api += $(subdirectory)/devices
 
+# To compile cordio.a, uncomment the next 3 lines, and comment out the local_src above and lib_prebuilt line below.
+# --- THIS ---
 # local_bin := $(BINDIR)/$(subdirectory)
 # bindirs   += $(local_bin)
-# Uncomment out the local_src, local_bin, bindirs, and make-library lines to create new cordio.a
+# $(eval $(call make-library, $(local_bin)/cordio.a, $(local_src)))
+# --- OR ---
 lib_prebuilt += $(subdirectory)/lib/$(BOARD)/$(EVB)/$(COMPILERNAME)/cordio.a
 
-# $(eval $(call make-library, $(local_bin)/cordio.a, $(local_src)))

@@ -62,7 +62,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5_2_a_1_1-c2486c8ef of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -88,8 +88,17 @@
     #endif
 
     //Set the default stimer clock source and clock value.
+    #ifdef APOLLO5_FPGA
+        #define DEFAULT_STIMER_CLOCK_HZ   ((APOLLO5_FPGA*1000000UL)/16)
+    #ifdef AM_PART_APOLLO510L
+        #define DEFAULT_STIMER_CLOCK      AM_HAL_STIMER_HFRC_6MHZ
+    #else
+        #define DEFAULT_STIMER_CLOCK      AM_HAL_STIMER_XTAL_32KHZ
+    #endif
+    #else
         #define DEFAULT_STIMER_CLOCK_HZ   32768
         #define DEFAULT_STIMER_CLOCK      AM_HAL_STIMER_XTAL_32KHZ
+    #endif
 
     #define portMAX_32_BIT_NUMBER		( 0xffffffffUL )
 

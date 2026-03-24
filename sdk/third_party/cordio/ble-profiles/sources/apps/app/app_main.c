@@ -60,6 +60,11 @@ appSecCfg_t *pAppSecCfg;
 /*! Configuration pointer for connection parameter update */
 appUpdateCfg_t *pAppUpdateCfg;
 
+#if (BT_53)
+/*! Configuration pointer for subrate parameter update */
+appSubrateCfg_t *pAppSubrateCfg;
+#endif // BT_53
+
 /*! Configuration pointer for discovery */
 appDiscCfg_t *pAppDiscCfg;
 

@@ -2,9 +2,9 @@
 //
 //! @file am_util_time.h
 //!
-//! @brief Functions useful for RTC, calendar, time, etc. computations.
+//! @brief Time and Date Utility Functions
 //!
-//! @addtogroup time Time - RTC Time Computations
+//! @addtogroup time_utils Time Utility Functions
 //! @ingroup utils
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5_2_a_1_1-c2486c8ef of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef AM_UTIL_TIME_H

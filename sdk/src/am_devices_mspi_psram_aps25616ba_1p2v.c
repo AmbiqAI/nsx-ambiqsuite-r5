@@ -2,11 +2,48 @@
 //
 //! @file am_devices_mspi_psram_aps25616ba_1p2v.c
 //!
-//! @brief APM DDR HEX and Octal SPI PSRAM driver.
+//! @brief Multi-bit SPI PSRAM driver for the APS25616BA 1.2V device.
 //!
-//! @addtogroup mspi_psram_aps25616ba APS25616BA MSPI PSRAM 1.2V Driver
+//! @addtogroup devices_mspi_psram_aps25616ba_1p2v APS25616BA MSPI PSRAM Driver
 //! @ingroup devices
 //! @{
+//!
+//! Purpose: This module provides a hardware abstraction layer
+//!          for the APS25616BA 1.2V Multi-bit SPI PSRAM device. It enables
+//!          low-voltage operation, high-speed read/write operations, DDR mode
+//!          support, and XIP functionality for embedded applications requiring
+//!          power-efficient external volatile memory. The driver supports efficient
+//!          data access, timing optimization, and system integration.
+//!
+//! @section devices_mspi_psram_aps25616ba_1p2v_features Key Features
+//!
+//! 1. @b Low-voltage @b Operation: Optimized for 1.2V power supply.
+//! 2. @b High-speed @b Access: Multi-bit SPI for fast read/write operations.
+//! 3. @b DDR @b Support: Double Data Rate for maximum throughput.
+//! 4. @b XIP @b Mode: Execute code directly from PSRAM.
+//! 5. @b Power @b Management: Enhanced low-power modes and fast wake-up.
+//!
+//! @section devices_mspi_psram_aps25616ba_1p2v_functionality Functionality
+//!
+//! - Initialize and configure APS25616BA device
+//! - Perform read/write operations with DMA support
+//! - Handle DDR mode configuration
+//! - Manage XIP mode settings
+//! - Control power states and voltage modes
+//!
+//! @section devices_mspi_psram_aps25616ba_1p2v_usage Usage
+//!
+//! 1. Initialize device with am_devices_mspi_psram_aps25616ba_1p2v_init()
+//! 2. Read/write data using blocking or non-blocking APIs
+//! 3. Enable XIP mode for code execution
+//! 4. Configure DDR mode as needed
+//!
+//! @section devices_mspi_psram_aps25616ba_1p2v_configuration Configuration
+//!
+//! - Set up MSPI interface and timing parameters
+//! - Configure voltage and power settings
+//! - Enable DDR mode features
+//! - Optimize power management settings
 //
 //*****************************************************************************
 
@@ -44,7 +81,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5_2_a_1_1-c2486c8ef of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -61,11 +98,7 @@
 //*****************************************************************************
 //#define USE_NON_DQS_MODE
 
-#if defined(USE_NEW_DDR)
-#define MSPI_BASE_FREQUENCY AM_HAL_MSPI_CLK_96MHZ
-#else
 #define MSPI_BASE_FREQUENCY AM_HAL_MSPI_CLK_48MHZ
-#endif
 
 #define APS25616BA_tHS_MIN_US        155   // with margin
 #define APS25616BA_tXHS_MIN_US       155 // with margin
@@ -343,11 +376,6 @@ am_hal_mspi_dev_config_t  APMDDROctalMSPIConfig =
   .bEnWriteLatency      = true,
   .bEmulateDDR          = true,
 #if defined(AM_PART_APOLLO5_API)
-#if defined(USE_NEW_DDR)
-  .bNewDDR              = true,
-#else
-  .bNewDDR              = false,
-#endif
   .eCeLatency           = AM_HAL_MSPI_CE_LATENCY_NORMAL,
 #endif
   .ui16DMATimeLimit     = 40,
@@ -799,7 +827,11 @@ am_devices_mspi_peripheral_init(uint32_t ui32Module,
 
   if ( !pPsram->pDqsCfg->bDQSEnable )
   {
+#if defined(USE_APS51216BA)
+      pPsram->stSetting.ui8TurnAround = (pPsram->stSetting.ui8TurnAround - 1) * 2;
+#else
       pPsram->stSetting.ui8TurnAround *= 2;
+#endif
   }
 
   if (AM_HAL_STATUS_SUCCESS != am_hal_mspi_device_configure(pPsram->pMspiHandle, &pPsram->stSetting))
@@ -1047,7 +1079,11 @@ am_devices_mspi_psram_aps25616ba_device_init(am_devices_mspi_psram_t *pPsram, am
 #endif
   if ( !pPsram->pDqsCfg->bDQSEnable )
   {
+#if defined(USE_APS51216BA)
+      pPsram->stSetting.ui8TurnAround = (pPsram->stSetting.ui8TurnAround - 1) * 2;
+#else
       pPsram->stSetting.ui8TurnAround *= 2;
+#endif
   }
 
   if (AM_HAL_STATUS_SUCCESS != am_hal_mspi_device_configure(pPsram->pMspiHandle, &pPsram->stSetting))
@@ -1282,6 +1318,9 @@ am_devices_mspi_psram_aps25616ba_ddr_init(uint32_t ui32Module,
     }
 
     psConfig->eClockFreq = pDevCfg->eClockFreq;
+#if defined(AM_PART_APOLLO330P_510L)
+    psConfig->eCeLatency = AM_HAL_MSPI_CE_LATENCY_ADD1;
+#endif
 
     switch (pDevCfg->eDeviceConfig)
     {
@@ -2221,14 +2260,14 @@ static int prepare_test_pattern(uint32_t pattern_index, uint8_t* buff, uint32_t 
 //#define MEMORY_BYTE_ACCESS
 #define MEMORY_COPY_ACCESS
 #if defined(MEMORY_WORD_ACCESS)
-AM_SHARED_RW uint8_t ui32TxBuffer[PSRAM_CHECK_DATA_SIZE_BYTES / 4];
-AM_SHARED_RW uint8_t ui32RxBuffer[PSRAM_CHECK_DATA_SIZE_BYTES / 4];
+AM_SHARED_RW static uint8_t ui32TxBuffer[PSRAM_CHECK_DATA_SIZE_BYTES / 4];
+AM_SHARED_RW static uint8_t ui32RxBuffer[PSRAM_CHECK_DATA_SIZE_BYTES / 4];
 #elif defined(MEMORY_SHORT_ACCESS)
-AM_SHARED_RW uint8_t ui16TxBuffer[PSRAM_CHECK_DATA_SIZE_BYTES / 2];
-AM_SHARED_RW uint8_t ui16RxBuffer[PSRAM_CHECK_DATA_SIZE_BYTES / 2];
+AM_SHARED_RW static uint8_t ui16TxBuffer[PSRAM_CHECK_DATA_SIZE_BYTES / 2];
+AM_SHARED_RW static uint8_t ui16RxBuffer[PSRAM_CHECK_DATA_SIZE_BYTES / 2];
 #else
-AM_SHARED_RW uint8_t ui8TxBuffer[PSRAM_CHECK_DATA_SIZE_BYTES];
-AM_SHARED_RW uint8_t ui8RxBuffer[PSRAM_CHECK_DATA_SIZE_BYTES];
+AM_SHARED_RW static uint8_t ui8TxBuffer[PSRAM_CHECK_DATA_SIZE_BYTES];
+AM_SHARED_RW static uint8_t ui8RxBuffer[PSRAM_CHECK_DATA_SIZE_BYTES];
 #endif
 
 //*****************************************************************************

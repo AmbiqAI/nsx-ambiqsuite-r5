@@ -643,6 +643,11 @@ static void fitProcMsg(fitMsg_t *pMsg)
       break;
 
     case DM_RESET_CMPL_IND:
+    {
+      uint8_t addr[BDA_ADDR_LEN];
+      SecRand(addr, BDA_ADDR_LEN);
+      DM_RAND_ADDR_SET(addr, DM_RAND_ADDR_STATIC);
+      DmDevSetRandAddr(addr);
 #ifdef AM_BLE_USE_NVM
         AppLoadResList();
 #endif
@@ -661,6 +666,7 @@ static void fitProcMsg(fitMsg_t *pMsg)
       }
 
       uiEvent = APP_UI_RESET_CMPL;
+    }
       break;
 
     case ATTS_DB_HASH_CALC_CMPL_IND:

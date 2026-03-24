@@ -4,10 +4,45 @@
 //!
 //! @brief HAL Utility Functions
 //!
-//! @addtogroup utils4 Utils - HAL Utility Functions
-//! @ingroup apollo510_hal
+//! @addtogroup utils4_ap510L Utils - HAL Utility Functions
+//! @ingroup apollo510L_hal
 //! @{
-//
+//!
+//! Purpose: This module provides utility functions for the HAL on Apollo5 devices,
+//!          including delay functions, status checking, and memory operations.
+//!          It supports precise timing control, status monitoring, and efficient
+//!          memory access for system-level operations and debugging.
+//!
+//! @section hal_utils_features Key Features
+//!
+//! 1. @b Delay @b Functions: Precise microsecond and cycle-based delay operations.
+//! 2. @b Status @b Monitoring: Check register status with timeout capabilities.
+//! 3. @b Memory @b Operations: Efficient word-based memory read operations.
+//! 4. @b Burst @b Mode: Support for burst mode status checking.
+//! 5. @b BootROM @b Integration: Integration with bootrom helper functions.
+//!
+//! @section hal_utils_functionality Functionality
+//!
+//! - Provide precise delay functions in microseconds and cycles
+//! - Monitor register status with timeout and equality checking
+//! - Support efficient memory read operations
+//! - Handle burst mode status and configuration
+//! - Integrate with bootrom helper functionality
+//!
+//! @section hal_utils_usage Usage
+//!
+//! 1. Use delay functions for precise timing control
+//! 2. Monitor register status with timeout capabilities
+//! 3. Perform efficient memory read operations
+//! 4. Check burst mode status as needed
+//! 5. Integrate with bootrom helper functions
+//!
+//! @section hal_utils_configuration Configuration
+//!
+//! - @b Delay @b Timing: Configure delay parameters and cycle counts
+//! - @b Status @b Monitoring: Set up timeout values and status checking
+//! - @b Memory @b Access: Configure memory read operations
+//! - @b Burst @b Mode: Set up burst mode operations
 //*****************************************************************************
 
 //*****************************************************************************
@@ -44,7 +79,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5_2_a_1_1-c2486c8ef of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -100,14 +135,14 @@ typedef enum
 //!
 //!  @param ui32Iterations The number of iterations.
 //!
-//!  This function is located in ITCM, which means instruction fetch bypasses
+//!  This function is located in TCM, which means instruction fetch bypasses
 //!  I-Cache. Each iteration spends 3 CPU cycles.
 //
 //*****************************************************************************
 #if defined(__IAR_SYSTEMS_ICC__)
 __ramfunc void
 #else
-void __attribute__((naked, section(".itcm_text")))
+void __attribute__((naked, section(".dtcm_text")))
 #endif
 br_util_delay_cycles(uint32_t ui32Cycles)
 {
@@ -134,7 +169,7 @@ am_hal_delay_us(uint32_t ui32us)
     //
     // Check for LP (96MHz) vs. HP (192MHz/250MHz) mode and create the adjustment accordingly.
     //
-    if (PWRCTRL->MCUPERFREQ_b.MCUPERFSTATUS == AM_HAL_PWRCTRL_MCU_MODE_HIGH_PERFORMANCE)
+    if (PWRCTRL->MCUPERFREQ_b.MCUPERFSTATUS == AM_HAL_PWRCTRL_MCU_MODE_HIGH_PERFORMANCE2)
     {
         //
         // Use float instead of uint32_t, otherwise saturation may occur.
@@ -145,6 +180,18 @@ am_hal_delay_us(uint32_t ui32us)
         // There's an additional shift to account for.
         //
         ui32CycleCntAdj = ((13 * AM_HAL_CLKGEN_FREQ_HP250_MHZ / AM_HAL_CLKGEN_FREQ_MAX_MHZ) + 40) / 3;
+    }
+    else if (PWRCTRL->MCUPERFREQ_b.MCUPERFSTATUS == AM_HAL_PWRCTRL_MCU_MODE_HIGH_PERFORMANCE1)
+    {
+        //
+        // Use float instead of uint32_t, otherwise saturation may occur.
+        //
+        ui32Iterations = (uint32_t)(ui32Iterations * 1.0f * AM_HAL_CLKGEN_FREQ_HP192_MHZ / AM_HAL_CLKGEN_FREQ_MAX_MHZ);
+
+        //
+        // There's an additional shift to account for.
+        //
+        ui32CycleCntAdj = ((13 * AM_HAL_CLKGEN_FREQ_HP192_MHZ / AM_HAL_CLKGEN_FREQ_MAX_MHZ) + 40) / 3;
     }
     else
     {
@@ -255,7 +302,7 @@ am_hal_delay_us_status_check(uint32_t ui32usMaxDelay, uint32_t ui32Address,
 //!
 //!  @param pAddr The address to read.
 //!
-//!  This function is located in ITCM, which means instruction fetch bypasses
+//!  This function is located in TCM, which means instruction fetch bypasses
 //!  I-Cache.
 //
 //*****************************************************************************
@@ -264,7 +311,7 @@ am_hal_delay_us_status_check(uint32_t ui32usMaxDelay, uint32_t ui32Address,
                                 // return statement on a non-void function
 __ramfunc uint32_t
 #else
-uint32_t __attribute__((naked, section(".itcm_text")))
+uint32_t __attribute__((naked, section(".dtcm_text")))
 #endif
 internal_hal_read_word(uint32_t *pAddr)
 {
@@ -286,14 +333,14 @@ internal_hal_read_word(uint32_t *pAddr)
 //!  @param pDstAddr The starting address to write to.
 //!  @param numWords The number of words to read.
 //!
-//!  This function is located in ITCM, which means instruction fetch bypasses
+//!  This function is located in TCM, which means instruction fetch bypasses
 //!  I-Cache.
 //
 //*****************************************************************************
 #if defined(__IAR_SYSTEMS_ICC__)
 __ramfunc void
 #else
-void __attribute__((naked, section(".itcm_text")))
+void __attribute__((naked, section(".dtcm_text")))
 #endif
 internal_hal_read_words(uint32_t *pSrcAddr, uint32_t *pDstAddr, uint32_t numWords)
 {
@@ -315,7 +362,7 @@ internal_hal_read_words(uint32_t *pSrcAddr, uint32_t *pDstAddr, uint32_t numWord
 //!  @param pDstAddr The starting address to write to.
 //!  @param numWords The number of words to read.
 //!
-//!  This function is located in ITCM, which means instruction fetch bypasses
+//!  This function is located in TCM, which means instruction fetch bypasses
 //!  I-Cache.
 //
 //*****************************************************************************

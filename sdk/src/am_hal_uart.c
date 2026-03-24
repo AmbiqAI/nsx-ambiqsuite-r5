@@ -4,9 +4,45 @@
 //!
 //! @brief Hardware abstraction for the UART
 //!
-//! @addtogroup uart UART Functionality
-//! @ingroup apollo510_hal
+//! @addtogroup uart_ap510L UART Functionality
+//! @ingroup apollo510L_hal
 //! @{
+//!
+//! Purpose: This module provides comprehensive UART (Universal Asynchronous
+//!          Receiver/Transmitter) hardware abstraction for Apollo5 devices.
+//!          It supports UART configuration, data transfer, interrupt handling,
+//!          and DMA operations for serial communication applications.
+//!
+//! @section hal_uart_features Key Features
+//!
+//! 1. @b UART @b Configuration: Flexible baud rate and parameter configuration.
+//! 2. @b Data @b Transfer: Support for blocking and non-blocking data transfer.
+//! 3. @b DMA @b Support: High-speed DMA-based data transfer operations.
+//! 4. @b Interrupt @b Handling: Comprehensive interrupt management for UART events.
+//! 5. @b FIFO @b Management: Advanced FIFO handling and buffer management.
+//!
+//! @section hal_uart_functionality Functionality
+//!
+//! - Initialize and configure UART peripheral
+//! - Handle data transfer operations (blocking/non-blocking)
+//! - Support DMA-based high-speed transfers
+//! - Manage FIFO buffers and data flow
+//! - Handle UART interrupts and status monitoring
+//!
+//! @section hal_uart_usage Usage
+//!
+//! 1. Initialize UART using am_hal_uart_initialize()
+//! 2. Configure UART parameters and baud rate
+//! 3. Set up DMA or interrupt handling as needed
+//! 4. Perform data transfer operations
+//! 5. Handle UART events and status monitoring
+//!
+//! @section hal_uart_configuration Configuration
+//!
+//! - @b Baud @b Rate: Configure UART baud rate and timing
+//! - @b Data @b Format: Set up data bits, parity, and stop bits
+//! - @b DMA @b Settings: Configure DMA transfer parameters
+//! - @b Interrupts: Set up interrupt sources and handlers
 //
 //*****************************************************************************
 
@@ -44,14 +80,18 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5_2_a_1_1-c2486c8ef of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "am_mcu_apollo.h"
 #include <string.h>
+#include "am_mcu_apollo.h"
+#include "am_hal_crm_private.h"
+
+// #TODO update when the reg of MCUCTRL D2ASPARE is updated
+#define MCUCTRL_D2ASPARE_UART0PLL  (0x01 << 22) // Bit 22 for UART0, Bit 23 for UART1
 
 //*****************************************************************************
 //
@@ -178,7 +218,12 @@ typedef struct
     //
     //! UART clock source.
     //
-    am_hal_clkmgr_clock_id_e eClkSrc;
+    am_hal_uart_clock_src_e eClkSrc;
+
+    //
+    //! UART clock Divider.
+    //
+    am_hal_uart_clock_div_e eClkDiv;
 
     //
     //! UART Dma mode
@@ -196,7 +241,7 @@ typedef struct
     //
     //! DMA transaction in progress.
     //
-    bool                bDMABusy;
+    volatile bool                bDMABusy;
 }
 am_hal_uart_state_t;
 
@@ -208,7 +253,10 @@ am_hal_uart_state_t g_am_hal_uart_states[AM_REG_UART_NUM_MODULES];
 // Static function prototypes.
 //
 //*****************************************************************************
-
+static uint32_t config_baudrate(uint32_t ui32Module,
+                                uint32_t ui32UartClkFreq,
+                                uint32_t ui32DesiredBaudrate,
+                                uint32_t *pui32ActualBaud);
 
 static uint32_t blocking_write(void *pHandle,
                                const am_hal_uart_transfer_t *psTransfer);
@@ -226,6 +274,8 @@ static void nonblocking_write_sm(void *pHandle);
 static void nonblocking_read_sm(void *pHandle);
 static uint32_t tx_queue_update(void *pHandle);
 static uint32_t rx_queue_update(void *pHandle);
+static uint32_t am_hal_uart_crm_apbclk_enable(uint32_t ui32Module, bool bEnable);
+static uint32_t am_hal_uart_clock_enable(uint32_t ui32Module, bool bEnable, am_hal_uart_clock_src_e eClkSrc, am_hal_uart_clock_div_e eClkDiv);
 
 //*****************************************************************************
 //
@@ -346,6 +396,8 @@ am_hal_uart_power_control(void *pHandle, uint32_t ePowerState,
     am_hal_pwrctrl_periph_e eUARTPowerModule = ((am_hal_pwrctrl_periph_e)
                                                 (AM_HAL_PWRCTRL_PERIPH_UART0 +
                                                  ui32Module));
+
+    //
     // Decode the requested power state and update UART operation accordingly.
     //
     switch (ePowerState)
@@ -361,20 +413,27 @@ am_hal_uart_power_control(void *pHandle, uint32_t ePowerState,
             {
                 return AM_HAL_STATUS_INVALID_OPERATION;
             }
-
+            if ( pState->ui32BaudRate > 1500000 )
+            {
+                // Resume D2ASPARE, force uart_gate.clken to be 1, making uart.pclk to be always-on
+                MCUCTRL->D2ASPARE |= (MCUCTRL_D2ASPARE_UART0PLL << ui32Module);
+            }
             //
             // Enable power control.
             //
             am_hal_pwrctrl_periph_enable(eUARTPowerModule);
 
+            //
+            // Enable APB UART clock.
+            //
+            am_hal_uart_crm_apbclk_enable(ui32Module, true);
+
             if (bRetainState)
             {
-                if ( ( pState->ui32BaudRate > 1500000 ) && ( APOLLO5_GE_B1 ) )
-                {
-                    // Resume D2ASPARE, force uart_gate.clken to be 1, making uart.pclk to be always-on
-                    MCUCTRL->D2ASPARE |= (MCUCTRL_D2ASPARE_UART0PLL_Msk << ui32Module);
-                }
-                am_hal_clkmgr_clock_request(pState->eClkSrc, (am_hal_clkmgr_user_id_e)(AM_HAL_CLKMGR_USER_ID_UART0 + ui32Module));
+                //
+                // Enable uart clock.
+                //
+                am_hal_uart_clock_enable(ui32Module, true, pState->eClkSrc, pState->eClkDiv);
 
                 //
                 // Restore UART registers
@@ -415,13 +474,15 @@ am_hal_uart_power_control(void *pHandle, uint32_t ePowerState,
 
                 // AM_CRITICAL_END
             }
-
-            if ( ( pState->ui32BaudRate > 1500000 ) && ( APOLLO5_GE_B1 ) )
+            if ( pState->ui32BaudRate > 1500000 )
             {
                 // Clear D2ASPARE to save power
-                MCUCTRL->D2ASPARE &= ~(MCUCTRL_D2ASPARE_UART0PLL_Msk << ui32Module);
+                MCUCTRL->D2ASPARE &= ~(MCUCTRL_D2ASPARE_UART0PLL << ui32Module);
             }
-            am_hal_clkmgr_clock_release(pState->eClkSrc, (am_hal_clkmgr_user_id_e)(AM_HAL_CLKMGR_USER_ID_UART0 + ui32Module));
+            //
+            // Disable uart clock.
+            //
+            am_hal_uart_clock_enable(ui32Module, false, pState->eClkSrc, pState->eClkDiv);
 
             //
             // Clear all interrupts before sleeping as having a pending UART
@@ -437,6 +498,11 @@ am_hal_uart_power_control(void *pHandle, uint32_t ePowerState,
             // to set the entire CR register to 0.
             //
             UARTn(ui32Module)->CR = 0;
+
+            //
+            // Disable APB UART clock.
+            //
+            am_hal_uart_crm_apbclk_enable(ui32Module, false);
 
             //
             // Disable power control.
@@ -674,13 +740,6 @@ am_hal_uart_dma_fullduplex_transfer(void *pTXHandle, void *pRXHandle,
         return AM_HAL_STATUS_IN_USE;
     }
 
-    // For 3Mbps, make sure to use 2 stop bits for TX and 1 stop bit for RX
-    if ((pUARTTXState->ui32BaudRate == 3000000) && (pUARTTXState->ui32BaudRate == pUARTRXState->ui32BaudRate))
-    {
-        UARTn(ui32TxModule)->LCRH_b.STP2 = AM_HAL_UART_TWO_STOP_BITS;
-        UARTn(ui32RxModule)->LCRH_b.STP2 = AM_HAL_UART_ONE_STOP_BIT;
-    }
-
     pUARTTXState->Transaction = *psTransaction;
     pUARTTXState->Transaction.eDirection = AM_HAL_UART_TX;
     am_hal_uart_dma_configure(pTXHandle, &pUARTTXState->Transaction);
@@ -829,74 +888,47 @@ am_hal_uart_buffer_configure(void *pHandle, uint8_t *pui8TxBuffer,
 //*****************************************************************************
 #define BAUDCLK     (16) // Number of UART clocks needed per bit.
 static uint32_t
-config_baudrate(uint32_t ui32Module, uint32_t ui32DesiredBaudrate, uint32_t *pui32ActualBaud)
+config_baudrate(uint32_t ui32Module, uint32_t ui32UartClkFreq, uint32_t ui32DesiredBaudrate, uint32_t *pui32ActualBaud)
 {
-    uint32_t ui32UartClkFreq;
+    uint64_t ui64FractionDivisorLong;
+    uint64_t ui64IntermediateLong;
+    uint32_t ui32IntegerDivisor;
+    uint32_t ui32FractionDivisor;
+    uint32_t ui32BaudClk;
 
-    //
-    // Check that the baudrate is in range.
-    //
-    switch ( UARTn(ui32Module)->CR_b.CLKSEL )
+    if (ui32UartClkFreq == 0)
     {
-        case UART0_CR_CLKSEL_PLL_CLK:
-            ui32UartClkFreq = 49152000;
-            break;
-
-        case UART0_CR_CLKSEL_HFRC_48MHZ:
-            ui32UartClkFreq = 48000000;
-            break;
-
-        case UART0_CR_CLKSEL_HFRC_24MHZ:
-            ui32UartClkFreq = 24000000;
-            break;
-
-        case UART0_CR_CLKSEL_HFRC_12MHZ:
-            ui32UartClkFreq = 12000000;
-            break;
-
-        case UART0_CR_CLKSEL_HFRC_6MHZ:
-            ui32UartClkFreq = 6000000;
-            break;
-
-        case UART0_CR_CLKSEL_HFRC_3MHZ:
-            ui32UartClkFreq = 3000000;
-            break;
-
-        default:
-            *pui32ActualBaud = 0;
-            return AM_HAL_UART_STATUS_CLOCK_NOT_CONFIGURED;
+        return AM_HAL_UART_STATUS_CLOCK_NOT_CONFIGURED;
     }
 
     //
     // Calculate register values.
     //
+    ui32BaudClk = BAUDCLK * ui32DesiredBaudrate;
+    ui32IntegerDivisor = (uint32_t)(ui32UartClkFreq / ui32BaudClk);
+    ui64IntermediateLong = (ui32UartClkFreq * 64) / ui32BaudClk; // Q58.6
+    ui64FractionDivisorLong = ui64IntermediateLong - (ui32IntegerDivisor * 64); // Q58.6
+    ui32FractionDivisor = (uint32_t)ui64FractionDivisorLong;
+
+    //
+    // Check the result.
+    //
+    if (ui32IntegerDivisor == 0)
     {
-        uint32_t ui32BaudClk             = BAUDCLK * ui32DesiredBaudrate;
-        uint32_t ui32IntegerDivisor      = (ui32UartClkFreq / ui32BaudClk);
-        uint64_t ui64IntermediateLong    = ((uint64_t) ui32UartClkFreq * 64) / ui32BaudClk; // Q58.6
-        uint64_t ui64FractionDivisorLong = ui64IntermediateLong - ((uint64_t) ui32IntegerDivisor * 64); // Q58.6
-        uint32_t ui32FractionDivisor     = (uint32_t) ui64FractionDivisorLong;
-
-        //
-        // Check the result.
-        //
-        if (ui32IntegerDivisor == 0)
-        {
-            *pui32ActualBaud = 0;
-            return AM_HAL_UART_STATUS_BAUDRATE_NOT_POSSIBLE;
-        }
-
-        //
-        // Write the UART regs.
-        //
-        UARTn(ui32Module)->IBRD = ui32IntegerDivisor;
-        UARTn(ui32Module)->FBRD = ui32FractionDivisor;
-
-        //
-        // Return the actual baud rate.
-        //
-        *pui32ActualBaud = (ui32UartClkFreq / ((BAUDCLK * ui32IntegerDivisor) + ui32FractionDivisor / 4));
+        *pui32ActualBaud = 0;
+        return AM_HAL_UART_STATUS_BAUDRATE_NOT_POSSIBLE;
     }
+
+    //
+    // Write the UART regs.
+    //
+    UARTn(ui32Module)->IBRD = ui32IntegerDivisor;
+    UARTn(ui32Module)->FBRD = ui32FractionDivisor;
+
+    //
+    // Return the actual baud rate.
+    //
+    *pui32ActualBaud = (ui32UartClkFreq / ((BAUDCLK * ui32IntegerDivisor) + ui32FractionDivisor / 4));
     return AM_HAL_STATUS_SUCCESS;
 } // config_baudrate()
 
@@ -1103,6 +1135,163 @@ am_hal_uart_rx_abort(void *pHandle)
 
 //*****************************************************************************
 //
+// Enable/disable the UART APB Clock
+//
+//*****************************************************************************
+static uint32_t
+am_hal_uart_crm_apbclk_enable(uint32_t ui32Module, bool bEnable)
+{
+    uint32_t ui32Status = AM_HAL_STATUS_SUCCESS;
+
+    if ( ui32Module == 0 )
+    {
+        ui32Status = am_hal_crm_control_UART0_CLOCK_SET(bEnable);
+    }
+    else
+    {
+        ui32Status = am_hal_crm_control_UART1_CLOCK_SET(bEnable);
+    }
+    return ui32Status;
+}
+
+//*****************************************************************************
+//
+// Configure and enable UARTHF clock.
+//
+//*****************************************************************************
+static inline uint32_t
+am_hal_uart_crm_hfclk_enable(uint32_t ui32Module, am_hal_uart_clock_src_e eClkSrc, am_hal_uart_clock_div_e eClkDiv)
+{
+    uint32_t ui32Status = AM_HAL_STATUS_SUCCESS;
+
+    if (ui32Module == 0)
+    {
+        ui32Status = am_hal_crm_clock_config_UART0HF((am_hal_crm_uart0hf_clksel_e)eClkSrc, eClkDiv);
+        if ( ui32Status != AM_HAL_STATUS_SUCCESS )
+        {
+            return ui32Status;
+        }
+        ui32Status = am_hal_crm_control_UART0HF_CLOCK_SET(true);
+        if (ui32Status != AM_HAL_STATUS_SUCCESS)
+        {
+            return ui32Status;
+        }
+    }
+    else
+    {
+        ui32Status = am_hal_crm_clock_config_UART1HF((am_hal_crm_uart1hf_clksel_e)eClkSrc, eClkDiv);
+        if ( ui32Status != AM_HAL_STATUS_SUCCESS )
+        {
+            return ui32Status;
+        }
+        ui32Status = am_hal_crm_control_UART1HF_CLOCK_SET(true);
+        if (ui32Status != AM_HAL_STATUS_SUCCESS)
+        {
+            return ui32Status;
+        }
+    }
+
+     return ui32Status;
+}
+
+//*****************************************************************************
+//
+// Disable UART HF clock
+//
+//*****************************************************************************
+static inline uint32_t
+am_hal_uart_crm_hfclk_disable(uint32_t ui32Module)
+{
+    uint32_t ui32Status = AM_HAL_STATUS_SUCCESS;
+
+    if (ui32Module == 0)
+    {
+        ui32Status = am_hal_crm_control_UART0HF_CLOCK_SET(false);
+    }
+    else
+    {
+        ui32Status = am_hal_crm_control_UART1HF_CLOCK_SET(false);
+    }
+
+     return ui32Status;
+}
+
+//*****************************************************************************
+//
+// USB clock control functions
+//
+// This function disables the high-frequency clock for the specified UART module.
+// It is used to save power when the UART is not in use.
+//
+//*****************************************************************************
+static uint32_t
+am_hal_uart_clock_enable(uint32_t ui32Module, bool bEnable, am_hal_uart_clock_src_e eClkSrc, am_hal_uart_clock_div_e eClkDiv)
+{
+    uint32_t ui32Status = AM_HAL_STATUS_SUCCESS;
+    am_hal_clkmgr_clock_id_e eUartRequestClk = AM_HAL_CLKMGR_CLK_ID_MAX;
+
+    eUartRequestClk = eClkSrc == AM_HAL_UART_HFCLK_SRC_HFRC_96M ? AM_HAL_CLKMGR_CLK_ID_HFRC : AM_HAL_CLKMGR_CLK_ID_PLLPOSTDIV;
+
+    if ( bEnable )
+    {
+        if (eUartRequestClk == AM_HAL_CLKMGR_CLK_ID_PLLPOSTDIV)
+        {
+            uint32_t ui32PLLPOSTDIVFreq = 0;
+
+            //
+            // Get the PLLPOSTDIV frequency.
+            //
+            ui32Status = am_hal_clkmgr_clock_config_get(AM_HAL_CLKMGR_CLK_ID_PLLPOSTDIV, &ui32PLLPOSTDIVFreq, NULL);
+            if (ui32Status != AM_HAL_STATUS_SUCCESS)
+            {
+                return ui32Status;
+            }
+            //
+            // Check if current PLLPOSTDIV frequency matches the expected frequency.
+            //
+            if (ui32PLLPOSTDIVFreq != AM_HAL_UART_PLLCLK_FREQ)
+            {
+                return AM_HAL_STATUS_FAIL;
+            }
+        }
+
+        //
+        // Request destination clock from clock manager
+        //
+        ui32Status = am_hal_clkmgr_clock_request(eUartRequestClk, (am_hal_clkmgr_user_id_e)(AM_HAL_CLKMGR_USER_ID_UART0 + ui32Module));
+        if (ui32Status != AM_HAL_STATUS_SUCCESS)
+        {
+            return ui32Status;
+        }
+
+        ui32Status = am_hal_uart_crm_hfclk_enable(ui32Module, eClkSrc, eClkDiv);
+        if (ui32Status != AM_HAL_STATUS_SUCCESS)
+        {
+            return ui32Status;
+        }
+    }
+    else
+    {
+        ui32Status = am_hal_uart_crm_hfclk_disable(ui32Module);
+        if (ui32Status != AM_HAL_STATUS_SUCCESS)
+        {
+            return ui32Status;
+        }
+        //
+        // Release requested clock.
+        //
+        ui32Status = am_hal_clkmgr_clock_release(eUartRequestClk, (am_hal_clkmgr_user_id_e)(AM_HAL_CLKMGR_USER_ID_UART0 + ui32Module));
+        if (ui32Status != AM_HAL_STATUS_SUCCESS)
+        {
+            return ui32Status;
+        }
+    }
+
+    return ui32Status;
+}
+
+//*****************************************************************************
+//
 // Used to configure basic UART settings.
 //
 //*****************************************************************************
@@ -1121,75 +1310,85 @@ am_hal_uart_configure(void *pHandle, const am_hal_uart_config_t *psConfig)
 #endif
     am_hal_uart_state_t *pState = (am_hal_uart_state_t *) pHandle;
     uint32_t ui32Module = pState->ui32Module;
+    uint32_t ui32Status;
+    uint32_t ui32UartClockSourceFrequency;
+    uint32_t ui32UartClockFrequency;
+    uint32_t ui32UartActualBaudRate;
+    am_hal_uart_clock_div_e clockDivider;
+    am_hal_uart_clock_src_e clockSource;
 
     //
-    // Reset the CR register to a known value.
+    // Set the clock source.
     //
-    UARTn(ui32Module)->CR = 0;
+    clockSource = psConfig->eClockSrc;
 
     //
-    // Start by enabling the clocks, which needs to happen in a critical
-    // section.
+    //  Set the clock source and divider
     //
-    UARTn(ui32Module)->CR_b.CLKEN = 1;
-
-    // B0 does not support SYSPLL
-    if ( ( psConfig->eClockSrc > AM_HAL_UART_CLOCK_SRC_SYSPLL ) ||
-         (( psConfig->eClockSrc == AM_HAL_UART_CLOCK_SRC_SYSPLL ) && ( APOLLO5_B0 )) )
+    switch (clockSource)
     {
-        return AM_HAL_STATUS_INVALID_ARG;
+        case AM_HAL_UART_HFCLK_SRC_HFRC_96M:
+            if (psConfig->ui32BaudRate > 1500000)
+            {
+                //
+                // set clock to frequency 48Mhz.
+                //
+                clockDivider = AM_HAL_UART_HFCLK_DIV2;
+            }
+            else
+            {
+                //
+                // set clock to frequency 24Mhz.
+                //
+                clockDivider = AM_HAL_UART_HFCLK_DIV4;
+            }
+            ui32UartClockSourceFrequency = AM_HAL_UART_HFRCCLK_FREQ;
+            break;
+        case AM_HAL_UART_HFCLK_SRC_PLLPOSTDIV:
+            clockDivider = AM_HAL_UART_HFCLK_DIV1;
+            ui32UartClockSourceFrequency = AM_HAL_UART_PLLCLK_FREQ;
+            break;
+        default:
+            return AM_HAL_STATUS_INVALID_ARG;
     }
-    pState->eClkSrc = (psConfig->eClockSrc == AM_HAL_UART_CLOCK_SRC_HFRC) ? AM_HAL_CLKMGR_CLK_ID_HFRC : AM_HAL_CLKMGR_CLK_ID_SYSPLL;
-    if ( psConfig->ui32BaudRate > 1500000 )
-    {
-        if ( APOLLO5_GE_B1 )
-        {
-            // Set D2ASPARE, force uart_gate.clken to be 1, making uart.pclk to be always-on
-            MCUCTRL->D2ASPARE |= (MCUCTRL_D2ASPARE_UART0PLL_Msk << ui32Module);
-        }
-        UARTn(ui32Module)->CR_b.CLKSEL = (pState->eClkSrc == AM_HAL_CLKMGR_CLK_ID_SYSPLL) ? UART0_CR_CLKSEL_PLL_CLK : UART0_CR_CLKSEL_HFRC_48MHZ;
-    }
-    else
-    {
-        if ( APOLLO5_GE_B1 )
-        {
-            // Clear D2ASPARE to save power
-            MCUCTRL->D2ASPARE &= ~(MCUCTRL_D2ASPARE_UART0PLL_Msk << ui32Module);
-        }
-        UARTn(ui32Module)->CR_b.CLKSEL = (pState->eClkSrc == AM_HAL_CLKMGR_CLK_ID_SYSPLL) ? UART0_CR_CLKSEL_PLL_CLK : UART0_CR_CLKSEL_HFRC_24MHZ;
-    }
-    am_hal_clkmgr_clock_request(pState->eClkSrc, (am_hal_clkmgr_user_id_e)(AM_HAL_CLKMGR_USER_ID_UART0 + ui32Module));
 
+    ui32Status = am_hal_uart_clock_enable(ui32Module, true, clockSource, clockDivider);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS)
+    {
+        return ui32Status;
+    }
     //
-    // Disable the UART.
+    // calculates the uart clock frequency.
     //
-    // AM_CRITICAL_BEGIN
-    UARTn(ui32Module)->CR_b.UARTEN = 0;
-    UARTn(ui32Module)->CR_b.RXE    = 0;
-    UARTn(ui32Module)->CR_b.TXE    = 0;
-    // AM_CRITICAL_END
+    ui32UartClockFrequency = ui32UartClockSourceFrequency / (clockDivider + 1);
 
     //
     // Set the baud rate.
     //
-    uint32_t ui32ErrorStatus = config_baudrate(ui32Module,
-                                      psConfig->ui32BaudRate,
-                                      &(pState->ui32BaudRate));
+    ui32Status = config_baudrate(ui32Module, ui32UartClockFrequency, psConfig->ui32BaudRate,
+                                      &ui32UartActualBaudRate);
 
-    if (ui32ErrorStatus != AM_HAL_STATUS_SUCCESS)
+    if (ui32Status != AM_HAL_STATUS_SUCCESS)
     {
-        return ui32ErrorStatus;
+        return ui32Status;
     }
-
     //
-    // Set the flow control options
+    // Save the configuration to the handle.
     //
-    // AM_CRITICAL_BEGIN
-    UARTn(ui32Module)->CR_b.RTSEN = 0;
-    UARTn(ui32Module)->CR_b.CTSEN = 0;
-    UARTn(ui32Module)->CR |= psConfig->eFlowControl;
-    // AM_CRITICAL_END
+    pState->eClkSrc = clockSource;
+    pState->eClkDiv = clockDivider;
+    pState->ui32BaudRate = ui32UartActualBaudRate;
 
+    if ( pState->ui32BaudRate > 1500000 )
+    {
+        // Resume D2ASPARE, force uart_gate.clken to be 1, making uart.pclk to be always-on
+        MCUCTRL->D2ASPARE |= (MCUCTRL_D2ASPARE_UART0PLL << ui32Module);
+    }
+    else
+    {
+        // Disable uart_gate.clken, making uart.pclk to be gated
+        MCUCTRL->D2ASPARE &= ~(MCUCTRL_D2ASPARE_UART0PLL << ui32Module);
+    }
     //
     // Calculate the parity options.
     //
@@ -1215,34 +1414,33 @@ am_hal_uart_configure(void *pHandle, const am_hal_uart_config_t *psConfig)
     }
 
     //
+    // Reset the UART.
+    //
+    UARTn(ui32Module)->CR = 0;
+    UARTn(ui32Module)->CR |= psConfig->eFlowControl;
+
+    //
     // Set the data format.
     //
-    // AM_CRITICAL_BEGIN
-    UARTn(ui32Module)->LCRH_b.BRK  = 0;
-    UARTn(ui32Module)->LCRH_b.PEN  = ui32ParityEnable;
-    UARTn(ui32Module)->LCRH_b.EPS  = ui32EvenParity;
-    UARTn(ui32Module)->LCRH_b.STP2 = psConfig->eStopBits;
-    UARTn(ui32Module)->LCRH_b.FEN  = 1;
-    UARTn(ui32Module)->LCRH_b.WLEN = psConfig->eDataBits;
-    UARTn(ui32Module)->LCRH_b.SPS  = 0;
-    // AM_CRITICAL_END
+    UARTn(ui32Module)->LCRH =   _VAL2FLD(UART0_LCRH_BRK, 0)                     |
+                                _VAL2FLD(UART0_LCRH_PEN, ui32ParityEnable)      |
+                                _VAL2FLD(UART0_LCRH_EPS, ui32EvenParity)        |
+                                _VAL2FLD(UART0_LCRH_STP2, psConfig->eStopBits)  |
+                                _VAL2FLD(UART0_LCRH_FEN, 1)                     |
+                                _VAL2FLD(UART0_LCRH_WLEN, psConfig->eDataBits)  |
+                                _VAL2FLD(UART0_LCRH_SPS, 0) ;
 
     //
     // Set the FIFO levels.
     //
-    // AM_CRITICAL_BEGIN
-    UARTn(ui32Module)->IFLS_b.TXIFLSEL = psConfig->eTXFifoLevel;
-    UARTn(ui32Module)->IFLS_b.RXIFLSEL = psConfig->eRXFifoLevel;
-    // AM_CRITICAL_END
-
+    UARTn(ui32Module)->IFLS =   _VAL2FLD(UART0_IFLS_TXIFLSEL, psConfig->eTXFifoLevel) |
+                                _VAL2FLD(UART0_IFLS_RXIFLSEL, psConfig->eRXFifoLevel) ;
     //
     // Enable the UART, RX, and TX.
     //
-    // AM_CRITICAL_BEGIN
-    UARTn(ui32Module)->CR_b.UARTEN = 1;
-    UARTn(ui32Module)->CR_b.RXE = 1;
-    UARTn(ui32Module)->CR_b.TXE = 1;
-    // AM_CRITICAL_END
+    UARTn(ui32Module)->CR |= _VAL2FLD(UART0_CR_UARTEN, 1) |
+                             _VAL2FLD(UART0_CR_RXE, 1)    |
+                             _VAL2FLD(UART0_CR_TXE, 1);
 
     return AM_HAL_STATUS_SUCCESS;
 }
@@ -1999,62 +2197,82 @@ nonblocking_read_sm(void *pHandle)
 //*****************************************************************************
 //
 // Wait for all of the traffic in the TX pipeline to be sent.
+// This function does not block forever
+// returns timeout error, if it detects a timeout
 //
 //*****************************************************************************
 uint32_t
 am_hal_uart_tx_flush(void *pHandle)
 {
+    uint32_t ui32RetStat = AM_HAL_STATUS_SUCCESS;
     am_hal_uart_state_t *pState = (am_hal_uart_state_t *) pHandle;
     uint32_t ui32Module = pState->ui32Module;
 
     //
-    // If our state variable says we're done, we're done.
+    // Ultimately need to wait for tx busy to complete
+    // First, wait for tx queue to empty, (the isr or dma should be emptying it into the fifo)
     //
-    if (pState->bLastTxComplete == true)
-    {
-        return AM_HAL_STATUS_SUCCESS;
-    }
+    am_hal_queue_t *pTxQ = &pState->sTxQueue;
 
     //
-    // If our state variable doesn't say we're done, we need to check to make
-    // sure this program is actually capable of using the state variable.
-    // Checking the interrupt enable bit isn't a perfect test, but it will give
-    // us a reasonable guess about whether the bLastTxComplete flag might be
-    // updated in the future.
+    // find the remaining queue size and double the max wait time,
+    // allowing for ISR and other unexpected delays
     //
-    if (UARTn(ui32Module)->IER & AM_HAL_UART_INT_TXCMP)
+    int32_t i32NumLeftInQueue = (int32_t) (pTxQ->ui32Length * 2);
+    if (i32NumLeftInQueue)
     {
-        while(pState->bLastTxComplete == false)
+        while (pTxQ->ui32Length)
         {
-            ONE_BYTE_DELAY(pState);
-        }
-    }
-    else
-    {
-        //
-        // If we don't know the UART status by now, the best we can do is check
-        // to see if the queue is empty, or it the busy bit is still set.
-        //
-        // If we have a TX queue, we should wait for it to empty.
-        //
-        if (pState->bEnableTxQueue)
-        {
-            while (am_hal_queue_data_left(&(pState->sTxQueue)))
+            if ( --i32NumLeftInQueue <= 0)
             {
-                ONE_BYTE_DELAY(pState);
+                ui32RetStat = AM_HAL_STATUS_TIMEOUT;
+                break;
             }
-        }
-
-        //
-        // Wait for the TX busy bit to go low.
-        //
-        while ( UARTn(ui32Module)->FR_b.BUSY )
-        {
             ONE_BYTE_DELAY(pState);
         }
     }
 
-    return AM_HAL_STATUS_SUCCESS;
+    //
+    // now if there is DMA running, wait for that
+    //
+
+    if (pState->bDMABusy)
+    {
+        //
+        // pad a little extra time to allow for unexpected delays
+        //
+        int32_t maxDmaSize = (AM_HAL_MAX_UART_DMA_SIZE + AM_HAL_MAX_UART_DMA_SIZE / 4);
+        while (pState->bDMABusy)
+        {
+            if ( --maxDmaSize <= 0)
+            {
+                ui32RetStat = AM_HAL_STATUS_TIMEOUT;
+                break;
+            }
+            ONE_BYTE_DELAY(pState);
+        }
+    }
+
+
+    //
+    // Now wait for fifo to empty.
+    // Use generous doubled max fifo size to allow for unexpected delays
+    // Waiting the full time is a timeout error.
+    //
+    int32_t i32GenerousFifoSize = AM_HAL_UART_FIFO_MAX * 2;
+
+    while ( UARTn(ui32Module)->FR_b.BUSY )
+    {
+        if ( --i32GenerousFifoSize <= 0 )
+        {
+            ui32RetStat = AM_HAL_STATUS_TIMEOUT;
+            break;
+        }
+        ONE_BYTE_DELAY(pState);
+    }
+
+    return ui32RetStat;
+
 }
 
 //*****************************************************************************

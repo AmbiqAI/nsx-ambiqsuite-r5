@@ -37,7 +37,20 @@ extern "C" {
 **************************************************************************************************/
 
 /*! \brief Stack release version label */
+#if defined(CFG_BT_54)
+#define BT_54 (1)
+#define BT_53 (1)
+#define STACK_VERSION         ((const char *)"Packetcraft Host v5.4\n")
+#elif defined(CFG_BT_53)
+#define BT_54 (0)
+#define BT_53 (1)
+#define STACK_VERSION         ((const char *)"Packetcraft Host v5.3\n")
+#else
+#define BT_54 (0)
+#define BT_53 (0)
 #define STACK_VERSION         ((const char *)"Packetcraft Host v5.2\n")
+#endif // defined(CFG_BT_54)
+
 /*! \brief Stack release version number */
 #define STACK_VER_NUM         1366
 

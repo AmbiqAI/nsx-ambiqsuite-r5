@@ -25,6 +25,7 @@
 #define ATT_UUID_H
 
 #include "att_defs.h"
+#include "cfg_stack.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -210,6 +211,10 @@ extern "C" {
 #define ATT_UUID_CLIENT_SUPPORTED_FEATURES  0x2B29    /*!< \brief Client Supported Features */
 #define ATT_UUID_DATABASE_HASH              0x2B2A    /*!< \brief Database Hash */
 #define ATT_UUID_SERVER_SUPPORTED_FEATURES  0x2B3A    /*!< \brief Server Supported Features */
+#if (BT_54)
+#define ATT_UUID_EDKM                       0x2B88    /*!< \brief Encrypted Data Key Material */
+#define ATT_UUID_SEC_LEVEL                  0x2BF5    /*!< \brief LE GATT Security Levels */
+#endif // BT_54
 #define ATT_UUID_CTE_ENABLE                 0x7F80    /*!< \brief Constant Tone Extension enable */
 #define ATT_UUID_CTE_MIN_LEN                0x7F81    /*!< \brief Constant Tone Extension minimum length */
 #define ATT_UUID_CTE_TX_CNT                 0x7F82    /*!< \brief Constant Tone Extension transmit count */
@@ -536,6 +541,10 @@ extern const uint8_t attCteTxDurChUuid[ATT_16_UUID_LEN]; /*!< \brief Constant To
 extern const uint8_t attCteIntChUuid[ATT_16_UUID_LEN];   /*!< \brief Constant Tone Extension interval */
 extern const uint8_t attCtePhyChUuid[ATT_16_UUID_LEN];   /*!< \brief Constant Tone Extension PHY */
 extern const uint8_t attSsfChUuid[ATT_16_UUID_LEN];     /*!< \brief Server supported features */
+#if (BT_54)
+extern const uint8_t attEdkmChUuid[ATT_16_UUID_LEN];     /*!< \brief Encrypted data key material */
+extern const uint8_t attSeclvlChUuid[ATT_16_UUID_LEN];   /*!< \brief LE GATT Security Levels */
+#endif // BT_54
 
 /**@}*/
 

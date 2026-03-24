@@ -747,3 +747,22 @@ bool_t AppPerAdvSetAdValue(uint8_t advHandle, uint8_t adType, uint8_t len, uint8
 
   return FALSE;
 }
+
+#if (BT_53)
+/*************************************************************************************************/
+/*!
+ *  \brief  Update periodic advertising Data ID(DID)
+ *
+ *  \param  advHandle Advertising handle.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void AppUpdatePerAdvDid(uint8_t advHandle)
+{
+  WSF_ASSERT(advHandle < DM_NUM_ADV_SETS);
+
+  /* Update periodic adv data ID*/
+  DmPerAdvSetData(advHandle, HCI_ADV_DATA_OP_UNCHANGED_DATA, 0, NULL);
+}
+#endif // BT_53

@@ -29,18 +29,16 @@
 #if CFG_TUD_ENABLED && CFG_TUSB_MCU == OPT_MCU_APOLLO5
 
 #include "device/dcd.h"
+#include "tusb.h"
 #include "am_mcu_apollo.h"
 #include "am_util_delay.h"
 #include "am_bsp.h"         // Declare BSP functions am_bsp_external_vddusb33_switch() and am_bsp_external_vddusb0p9_switch()
-
-#ifdef CFG_TUD_SPEED_HS2FS_CONVER
-extern tusb_speed_t tusb_request_speed_get(void);
-#endif
 
 /*------------------------------------------------------------------*/
 /* MACRO TYPEDEF CONSTANT ENUM
  *------------------------------------------------------------------*/
 static void *pUSBHandle = NULL;
+static tusb_speed_t eTusbSpeedSel = TUSB_SPEED_AUTO;
 
 static void dcd_usb_dev_evt_callback(am_hal_usb_dev_event_e eDevState) ;
 
@@ -72,25 +70,17 @@ dcd_usb_dev_evt_callback(am_hal_usb_dev_event_e eDevState)
     case AM_HAL_USB_DEV_EVT_BUS_RESET:
       am_hal_usb_intr_usb_enable(pUSBHandle, USB_CFG2_SOFE_Msk|USB_CFG2_ResumeE_Msk|USB_CFG2_SuspendE_Msk|USB_CFG2_ResetE_Msk);
       am_hal_usb_ep_init(pUSBHandle, 0, 0, 64);
-#ifdef CFG_TUD_SPEED_HS2FS_CONVER
 
-      if (tusb_request_speed_get() == TUSB_SPEED_HIGH)
+      if (eTusbSpeedSel == TUSB_SPEED_FULL)
       {
-          dcd_event_bus_reset(0, TUSB_SPEED_HIGH, true);
+        am_hal_usb_set_dev_speed(pUSBHandle, AM_HAL_USB_SPEED_FULL);
+        dcd_event_bus_reset(0, TUSB_SPEED_FULL, true);
       }
       else
       {
-          am_hal_usb_set_dev_speed(pUSBHandle, AM_HAL_USB_SPEED_FULL);
-          dcd_event_bus_reset(0, TUSB_SPEED_FULL, true);
+        am_hal_usb_set_dev_speed(pUSBHandle, AM_HAL_USB_SPEED_HIGH);
+        dcd_event_bus_reset(0, TUSB_SPEED_HIGH, true);
       }
-#else //CFG_TUD_SPEED_HS2FS_CONVER
-#if BOARD_DEVICE_RHPORT_SPEED == OPT_MODE_FULL_SPEED
-      am_hal_usb_set_dev_speed(pUSBHandle, AM_HAL_USB_SPEED_FULL);
-      dcd_event_bus_reset(0, TUSB_SPEED_FULL, true);
-#else
-      dcd_event_bus_reset(0, TUSB_SPEED_HIGH, true);
-#endif
-#endif  //CFG_TUD_SPEED_HS2FS_CONVER
       break;
     case AM_HAL_USB_DEV_EVT_RESUME:
       dcd_event_bus_signal(0, DCD_EVENT_RESUME, true);
@@ -168,6 +158,162 @@ dcd_usb_ep_xfer_complete_callback(const uint8_t ep_addr,
             }
             break;
     }
+}
+
+//*****************************************************************************
+//! @brief  Check and start USB PHY clock source
+//!
+//! @param setup
+//*****************************************************************************
+static inline void dcd_ambiq_start_usb_phy_ref_clk(am_hal_usb_dev_speed_e eUsbSpeed)
+{
+  uint32_t ui32Status = AM_HAL_STATUS_SUCCESS;
+
+  am_hal_usb_phyclksrc_e usb_phyclksrc_e = AM_HAL_USB_PHYCLKSRC_DEFAULT;
+#if defined(AM_PART_APOLLO330P_510L)
+  am_hal_usb_phyclksrc_div_e usb_phyclkdiv_e = AM_HAL_USB_PHYCLKSRC_DIV_1;
+#endif
+
+  //
+  // Override USB PHY Clock Selection if requested
+  //
+#if defined(AM_PART_APOLLO510) && defined(CFG_TUD_AM_USBPHY_CLK_SRC)
+  usb_phyclksrc_e = CFG_TUD_AM_USBPHY_CLK_SRC;
+#endif
+#if defined(AM_PART_APOLLO330P_510L) && defined(CFG_TUD_AM_USBPHY_CLK_SRC) && defined(CFG_TUD_AM_USBPHY_CLK_DIV)
+  usb_phyclksrc_e = CFG_TUD_AM_USBPHY_CLK_SRC;
+  usb_phyclkdiv_e = CFG_TUD_AM_USBPHY_CLK_DIV;
+#endif
+
+  //
+  // If PHYCLKSRC selection is DEFAULT, decide an appropriate clock source
+  // according to Board Information from Clock Manager
+  //
+#if defined(AM_PART_APOLLO510)
+  if (usb_phyclksrc_e == AM_HAL_USB_PHYCLKSRC_DEFAULT)
+  {
+    if (eUsbSpeed == AM_HAL_USB_SPEED_FULL)
+    {
+      usb_phyclksrc_e = AM_HAL_USB_PHYCLKSRC_HFRC_24M;
+    }
+    else
+    {
+      am_hal_clkmgr_board_info_t board;
+      am_hal_clkmgr_board_info_get(&board);
+
+      if (board.sXtalHs.ui32XtalHsFreq == 48000000)
+      {
+        usb_phyclksrc_e = AM_HAL_USB_PHYCLKSRC_XTAL_HS_DIV2;
+      }
+      else if (board.sXtalHs.ui32XtalHsFreq == 24000000)
+      {
+        usb_phyclksrc_e = AM_HAL_USB_PHYCLKSRC_XTAL_HS;
+      }
+      else if (board.ui32ExtRefClkFreq == 48000000)
+      {
+        usb_phyclksrc_e = AM_HAL_USB_PHYCLKSRC_EXTREFCLK_DIV2;
+      }
+      else if (board.ui32ExtRefClkFreq == 24000000)
+      {
+        usb_phyclksrc_e = AM_HAL_USB_PHYCLKSRC_EXTREFCLK;
+      }
+      else
+      {
+        usb_phyclksrc_e = AM_HAL_USB_PHYCLKSRC_PLL;
+      }
+    }
+  }
+
+  //
+  // If PLL is selected as clock source, Configure SYSPLL clock to clkmgr
+  //
+  if (usb_phyclksrc_e == AM_HAL_USB_PHYCLKSRC_PLL)
+  {
+    ui32Status = am_hal_clkmgr_clock_config(AM_HAL_CLKMGR_CLK_ID_SYSPLL, 24000000, NULL);
+  }
+  if (ui32Status != AM_HAL_STATUS_SUCCESS)
+  {
+    TU_LOG1("PLL clock config failed with status %d\n", ui32Status);
+    return;
+  }
+
+  //
+  // Set USB PHY clock source
+  //
+  am_hal_usb_set_phy_clk_source(pUSBHandle, usb_phyclksrc_e);
+
+#elif defined(AM_PART_APOLLO330P_510L)
+  if (usb_phyclksrc_e == AM_HAL_USB_PHYCLKSRC_DEFAULT)
+  {
+    if (eUsbSpeed == AM_HAL_USB_SPEED_FULL)
+    {
+      usb_phyclksrc_e = AM_HAL_USB_PHYCLKSRC_HFRC_48M;
+      usb_phyclkdiv_e = AM_HAL_USB_PHYCLKSRC_DIV_2;
+    }
+    else
+    {
+      am_hal_clkmgr_board_info_t board;
+      am_hal_clkmgr_board_info_get(&board);
+      if (board.sXtalHs.ui32XtalHsFreq == 48000000)
+      {
+        usb_phyclksrc_e = AM_HAL_USB_PHYCLKSRC_RF_XTAL_48M;
+        usb_phyclkdiv_e = AM_HAL_USB_PHYCLKSRC_DIV_2;
+      }
+      else if (board.sXtalHs.ui32XtalHsFreq == 24000000)
+      {
+        usb_phyclksrc_e = AM_HAL_USB_PHYCLKSRC_RF_XTAL_48M;
+        usb_phyclkdiv_e = AM_HAL_USB_PHYCLKSRC_DIV_1;
+      }
+      else if(board.ui32ExtRefClkFreq == 48000000)
+      {
+        usb_phyclksrc_e = AM_HAL_USB_PHYCLKSRC_EXTREF_CLK;
+        usb_phyclkdiv_e = AM_HAL_USB_PHYCLKSRC_DIV_2;
+      }
+      else if(board.ui32ExtRefClkFreq == 24000000)
+      {
+        usb_phyclksrc_e = AM_HAL_USB_PHYCLKSRC_EXTREF_CLK;
+        usb_phyclkdiv_e = AM_HAL_USB_PHYCLKSRC_DIV_1;
+      }
+      else
+      {
+        usb_phyclksrc_e = AM_HAL_USB_PHYCLKSRC_PLLPOSTDIV;
+        usb_phyclkdiv_e = AM_HAL_USB_PHYCLKSRC_DIV_1;
+      }
+    }
+  }
+
+  //
+  // If PLL is selected as clock source, Configure SYSPLL clock to clkmgr
+  //
+  if (usb_phyclksrc_e == AM_HAL_USB_PHYCLKSRC_PLLPOSTDIV)
+  {
+    ui32Status = am_hal_clkmgr_clock_config(AM_HAL_CLKMGR_CLK_ID_PLLPOSTDIV, 24000000 * ((uint8_t)usb_phyclkdiv_e + 1), NULL);
+  }
+  else if (usb_phyclksrc_e == AM_HAL_USB_PHYCLKSRC_PLLFOUT2)
+  {
+    ui32Status = am_hal_clkmgr_clock_config(AM_HAL_CLKMGR_CLK_ID_PLLPOSTDIV, 24000000 * 4 * ((uint8_t)usb_phyclkdiv_e + 1), NULL);
+  }
+  if (ui32Status != AM_HAL_STATUS_SUCCESS)
+  {
+    TU_LOG1("PLL clock config failed with status %d\n", ui32Status);
+    return;
+  }
+
+  //
+  // Set USB PHY clock source
+  //
+  am_hal_usb_set_phy_clk_source(pUSBHandle, usb_phyclksrc_e, usb_phyclkdiv_e);
+  #endif
+
+
+
+  //
+  // Enable PHY reference clock
+  // Note: Skip this for Apollo510 FPGA, and proceed for everything else
+  //
+  #if !(defined(AM_PART_APOLLO510) && defined(APOLLO5_FPGA))
+  am_hal_usb_phy_clock_enable(pUSBHandle, true, eUsbSpeed);
+  #endif
 }
 
 #undef AM_USB_CHARGER_DETECT
@@ -385,12 +531,24 @@ dcd_power_up(uint8_t rhport)
 
 
 #ifdef ENABLE_EXT_USB_PWR_RAILS
-
     //
-    // Enable the USB power rails
+    // Enable External USB power rails
     //
     am_bsp_external_vddusb33_switch(true);
+#ifndef AM_PART_APOLLO330P_510L
     am_bsp_external_vddusb0p9_switch(true);
+#endif // AM_PART_APOLLO330P_510L
+#endif // ENABLE_EXT_USB_PWR_RAILS
+
+#if defined(AM_PART_APOLLO330P_510L)
+    //
+    // Enable Internal USB power regulator
+    //
+    am_hal_mcuctrl_usb_phy_ldo0p9_enable(true);
+    am_util_delay_ms(1);
+#endif // AM_PART_APOLLO330P_510L
+
+#ifdef ENABLE_EXT_USB_PWR_RAILS
     am_util_delay_ms(50);
 #endif // ENABLE_EXT_USB_PWR_RAILS
 
@@ -413,35 +571,13 @@ dcd_power_up(uint8_t rhport)
     //
     am_hal_usb_disable_phy_reset_override();
 
-#ifdef CFG_TUD_SPEED_HS2FS_CONVER
-    am_hal_usb_dev_speed_e eUsbSpeed ;
-
-    if (tusb_request_speed_get()  == TUSB_SPEED_HIGH){
-        eUsbSpeed = AM_HAL_USB_SPEED_HIGH;
-    }
-    else
-    {
-        eUsbSpeed = AM_HAL_USB_SPEED_FULL;
-    }
-#else //CFG_TUD_SPEED_HS2FS_CONVER
-#if BOARD_DEVICE_RHPORT_SPEED == OPT_MODE_FULL_SPEED
-    am_hal_usb_dev_speed_e eUsbSpeed = AM_HAL_USB_SPEED_FULL;
-#else
-    am_hal_usb_dev_speed_e eUsbSpeed = AM_HAL_USB_SPEED_HIGH;
-#endif
-#endif //CFG_TUD_SPEED_HS2FS_CONVER
     //
-    // Override USB PHY Clock Selection if requested
+    // convert USB speed to HAL type
     //
-#if (defined(CFG_TUD_AM_USBPHY_CLK_SRC))
-    #if defined(AM_PART_APOLLO510)
-    am_hal_usb_set_phy_clk_source(pUSBHandle, CFG_TUD_AM_USBPHY_CLK_SRC);
-    #endif
-#endif
+    am_hal_usb_dev_speed_e eUsbSpeed = (eTusbSpeedSel == TUSB_SPEED_HIGH) ? AM_HAL_USB_SPEED_HIGH :
+                                                                            AM_HAL_USB_SPEED_FULL;
 
-#if defined(AM_PART_APOLLO510)
-    am_hal_usb_phy_clock_enable(pUSBHandle, true, eUsbSpeed);
-#endif
+    dcd_ambiq_start_usb_phy_ref_clk(eUsbSpeed);
 
     am_hal_usb_set_dev_speed(pUSBHandle, eUsbSpeed);
 
@@ -472,19 +608,24 @@ void dcd_power_down(uint8_t rhport)
   am_hal_usb_dev_speed_e eUsbSpeed = AM_HAL_USB_SPEED_FULL;
   am_hal_usb_set_dev_speed(pUSBHandle, eUsbSpeed);
 
-#if (defined(AM_PART_APOLLO510) && !defined(APOLLO5_FPGA))
+#if !(defined(AM_PART_APOLLO510) && defined(APOLLO5_FPGA))
   am_hal_usb_phy_clock_enable(pUSBHandle, false, eUsbSpeed);
 #endif
 
   am_hal_usb_enable_phy_reset_override();
 
-#ifdef ENABLE_EXT_USB_PWR_RAILS
+#ifdef AM_PART_APOLLO330P_510L
+  am_hal_mcuctrl_usb_phy_ldo0p9_enable(false);
+#endif
 
+#ifdef ENABLE_EXT_USB_PWR_RAILS
   //
   // Disable the USB power rails
   //
   am_bsp_external_vddusb33_switch(false);
+#ifndef AM_PART_APOLLO330P_510L
   am_bsp_external_vddusb0p9_switch(false);
+#endif
   am_util_delay_ms(50);
 #endif // ENABLE_EXT_USB_PWR_RAILS
 
@@ -496,9 +637,54 @@ void dcd_power_down(uint8_t rhport)
 //
 // @param rhport
 //*****************************************************************************
-void
-dcd_init (uint8_t rhport)
+bool
+dcd_init(uint8_t rhport, const tusb_rhport_init_t* rh_init)
 {
+  // Default Sepeed is auto if rhport init parameter is not passed in
+  tusb_speed_t eSpeed = TUSB_SPEED_AUTO;
+
+  // If rhport init parameters is passed in
+  if (rh_init != NULL)
+  {
+    // Only Device role is supported
+    if (rh_init->role != TUSB_ROLE_DEVICE)
+    {
+      return false;
+    }
+    // update speed requested by the struct passed in
+    eSpeed = rh_init->speed;
+  }
+
+  // Check and decide speed to initialize
+  switch (eSpeed)
+  {
+    case TUSB_SPEED_AUTO:
+      #if BOARD_DEVICE_RHPORT_SPEED == OPT_MODE_HIGH_SPEED
+      eTusbSpeedSel = TUSB_SPEED_HIGH;
+      #elif BOARD_DEVICE_RHPORT_SPEED == OPT_MODE_FULL_SPEED
+      eTusbSpeedSel = TUSB_SPEED_FULL;
+      #else
+      return false;
+      #endif
+      break;
+
+    case TUSB_SPEED_HIGH:
+      #if BOARD_DEVICE_RHPORT_SPEED == OPT_MODE_HIGH_SPEED
+      eTusbSpeedSel = TUSB_SPEED_HIGH;
+      #else
+      return false;
+      #endif
+      break;
+
+    case TUSB_SPEED_FULL:
+      eTusbSpeedSel = TUSB_SPEED_FULL;
+      break;
+
+    default:
+      return false;
+      break;
+  }
+
 #if defined(AM_PART_APOLLO5A)
     //
     // Enable HFRC ADJ
@@ -526,7 +712,10 @@ dcd_init (uint8_t rhport)
     //
 
     uint32_t initStat = am_hal_usb_initialize(0, (void *) &pUSBHandle);
-    if (initStat != AM_HAL_STATUS_SUCCESS) return;
+    if (initStat != AM_HAL_STATUS_SUCCESS)
+    {
+      return false;
+    }
 
     //
     // Register the callback functions
@@ -536,22 +725,20 @@ dcd_init (uint8_t rhport)
     am_hal_usb_register_ep_xfer_complete_callback(pUSBHandle, dcd_usb_ep_xfer_complete_callback);
 
 
-#if defined (AM_PART_APOLLO510)
 #if defined (AM_CFG_USB_DMA_MODE_0)
-  am_hal_usb_set_xfer_mode(pUSBHandle, AM_HAL_USB_OUT_DMA_MODE_0);
-  am_hal_usb_set_xfer_mode(pUSBHandle, AM_HAL_USB_IN_DMA_MODE_0);
+    am_hal_usb_set_xfer_mode(pUSBHandle, AM_HAL_USB_OUT_DMA_MODE_0);
+    am_hal_usb_set_xfer_mode(pUSBHandle, AM_HAL_USB_IN_DMA_MODE_0);
 #elif defined (AM_CFG_USB_DMA_MODE_1)
-  am_hal_usb_set_xfer_mode(pUSBHandle, AM_HAL_USB_OUT_DMA_MODE_1);
-  am_hal_usb_set_xfer_mode(pUSBHandle, AM_HAL_USB_IN_DMA_MODE_1);
-#endif
+    am_hal_usb_set_xfer_mode(pUSBHandle, AM_HAL_USB_OUT_DMA_MODE_1);
+    am_hal_usb_set_xfer_mode(pUSBHandle, AM_HAL_USB_IN_DMA_MODE_1);
 #endif
 
-#if defined(AM_PART_APOLLO510)
-   dcd_ep_dbuf_configure();
-#endif
+    dcd_ep_dbuf_configure();
 
     dcd_power_up(rhport);
     dcd_connect(rhport);
+
+    return true;
 }
 
 //*****************************************************************************
@@ -561,7 +748,7 @@ dcd_init (uint8_t rhport)
 //! @param rhport
 //
 //*****************************************************************************
-void
+bool
 dcd_deinit(uint8_t rhport)
 {
   //
@@ -576,6 +763,8 @@ dcd_deinit(uint8_t rhport)
   dcd_power_down(rhport);
   am_hal_usb_deinitialize(pUSBHandle);
   pUSBHandle = NULL;
+
+  return true;
 }
 
 //*****************************************************************************
@@ -691,19 +880,11 @@ dcd_edpt_close(uint8_t rhport, uint8_t ep_addr)
 // is invoked to notify the stack
 //
 //*****************************************************************************
-#if defined (AM_PART_APOLLO510)
 bool
 dcd_edpt_xfer (uint8_t rhport,
                uint8_t ep_addr,
                uint8_t * buffer,
                uint32_t total_bytes)
-#else
-bool
-dcd_edpt_xfer (uint8_t rhport,
-               uint8_t ep_addr,
-               uint8_t * buffer,
-               uint16_t total_bytes)
-#endif
 {
   (void) rhport;
 
@@ -792,12 +973,8 @@ dcd_disconnect(uint8_t rhport)
 {
     (void) rhport;
     am_hal_usb_detach(pUSBHandle);
-#ifdef CFG_TUD_SPEED_HS2FS_CONVER
-    dcd_event_bus_signal(0, DCD_EVENT_UNPLUGGED, false);
-#endif
 }
 
-#if defined(AM_PART_APOLLO510)
 //*****************************************************************************
 //
 //! @brief Configure Double-Buffer settings to HAL
@@ -837,7 +1014,6 @@ dcd_ep_dbuf_configure(void)
     am_hal_usb_enable_ep_double_buffer(pUSBHandle, 5, AM_HAL_USB_OUT_DIR, true);
     #endif
 }
-#endif
 
 //*****************************************************************************
 //
@@ -847,33 +1023,29 @@ dcd_ep_dbuf_configure(void)
 void
 am_usb_isr(void)
 {
+  tusb_int_handler(0,true);
+}
 
-    #if defined(AM_PART_APOLLO5A)
-    uint32_t ui32IntStatus[3];
-    am_hal_usb_intr_status_get(pUSBHandle,
-                               &ui32IntStatus[0],
-                               &ui32IntStatus[1],
-                               &ui32IntStatus[2]);
-    am_hal_usb_interrupt_service(pUSBHandle,
-                                 ui32IntStatus[0],
-                                 ui32IntStatus[1],
-                                 ui32IntStatus[2]);
+//*****************************************************************************
+//
+// USB device interrupt handler
+//
+//*****************************************************************************
+void
+dcd_int_handler(uint8_t rhport)
+{
+    (void)rhport;
+    am_hal_usb_handle_isr(pUSBHandle);
+}
 
-    #else
-    uint32_t ui32IntStatus[5];
-    am_hal_usb_intr_status_get(pUSBHandle,
-                               &ui32IntStatus[0],
-                               &ui32IntStatus[1],
-                               &ui32IntStatus[2],
-                               &ui32IntStatus[3],
-                               &ui32IntStatus[4]);
-    am_hal_usb_interrupt_service(pUSBHandle,
-                                 ui32IntStatus[0],
-                                 ui32IntStatus[1],
-                                 ui32IntStatus[2],
-                                 ui32IntStatus[3],
-                                 ui32IntStatus[4]);
-    #endif
+//*****************************************************************************
+//
+// Dummy implementation for tusb time acquisition. It should be implemented in
+// board/application layer if USB Host mode is supported.
+//
+//*****************************************************************************
+TU_ATTR_WEAK uint32_t tusb_time_millis_api(void) {
+    return 0;
 }
 
 #endif // CFG_TUD_ENABLED && CFG_TUSB_MCU == OPT_MCU_APOLLO5

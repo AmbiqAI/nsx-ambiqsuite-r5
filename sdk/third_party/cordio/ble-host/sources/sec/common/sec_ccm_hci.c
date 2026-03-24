@@ -55,6 +55,8 @@ enum
   SEC_CCM_STATE_MIC_COMPLETE,
 };
 
+
+
 /**************************************************************************************************
   External Variables
 **************************************************************************************************/
@@ -371,9 +373,10 @@ static void secCcmGenSi(secQueueBuf_t *pBuf, uint8_t *pPriorS)
     {
       /* Encription complete.  Send notification. */
       secCcmEncMsg_t *pMsg = (secCcmEncMsg_t *) &pBuf->msg;
-
-      pMsg->pCiphertext = pCcm->pWorking;
-      pMsg->textLen = pCcm->textLen + pCcm->clearLen + pCcm->micLen;
+      // The encryption result is started from resultOffset
+      // and not include the clearLen as the AAD(Additional Authenticated Data) only affects the encrypted result of MIC.
+      pMsg->pCiphertext = &(pCcm->pWorking[resultOffset]);
+      pMsg->textLen = pCcm->textLen + pCcm->micLen;
       WsfMsgSend(pCcm->handlerId, pMsg);
     }
     else

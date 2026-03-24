@@ -128,6 +128,9 @@ static void dmConn2ActAuthToExpired(dmConnCcb_t *pCcb, hciEvt_t *pEvent);
 static void dmConn2ActReadRemoteFeaturesCmpl(dmConnCcb_t *pCcb, hciEvt_t *pEvent);
 static void dmConn2ActReadRemoteVerInfoCmpl(dmConnCcb_t *pCcb, hciEvt_t *pEvent);
 static void dmConn2ActReqPeerSca(dmConnCcb_t *pCcb, hciEvt_t *pEvent);
+#if (BT_53)
+static void dmConn2ActSubrateChange(dmConnCcb_t *pCcb, hciEvt_t *pEvent);
+#endif // BT_53
 
 /*************************************************************************************************/
 /*!
@@ -672,6 +675,10 @@ void dmConnReset(void)
 
   dmCb.initFiltPolicy = HCI_FILT_NONE;
   dmCb.connAddrType = DM_ADDR_PUBLIC;
+#if (BT_54)
+  dmCb.advHandle = 0xFF;
+  dmCb.subEvent = 0xFF;
+#endif // BT_54
 }
 
 /*************************************************************************************************/
@@ -811,6 +818,16 @@ void dmConn2MsgHandler(wsfMsgHdr_t *pMsg)
         HciLeRequestPeerScaCmd(pCcb->handle);
         break;
 
+#if (BT_53)
+      case DM_CONN_MSG_API_SUBRATE_REQ:
+      {
+        hciLeSubrateReq_t subrateReq;
+        memcpy(&subrateReq, &pConn2Msg->apiSubrateReq.subrate, sizeof(hciLeSubrateReq_t));
+        HciLeSubrateReqCmd(pCcb->handle, &subrateReq);
+        break;
+      }
+#endif // BT_53
+
       default:
         /* should never get here */
         break;
@@ -868,6 +885,12 @@ void dmConn2HciHandler(hciEvt_t *pEvent)
       case HCI_LE_REQ_PEER_SCA_CBACK_EVT:
         dmConn2ActReqPeerSca(pCcb, pEvent);
         break;
+
+#if (BT_53)
+      case HCI_LE_SUBRATE_CHANGE_CBACK_EVT:
+        dmConn2ActSubrateChange(pCcb, pEvent);
+        break;
+#endif // BT_53
 
       default:
         /* should never get here */
@@ -1055,6 +1078,37 @@ static void dmConn2ActReadRemoteFeaturesCmpl(dmConnCcb_t *pCcb, hciEvt_t *pEvent
 
   (*dmConnCb.connCback[DM_CLIENT_ID_APP])((dmEvt_t *) &evt);
 }
+
+#if (BT_53)
+/*************************************************************************************************/
+/*!
+ *  \brief  Handle an LE Subrate change event from HCI.
+ *
+ *  \param  pCcb    Connection control block.
+ *  \param  pEvent  Pointer to HCI callback event structure.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+static void dmConn2ActSubrateChange(dmConnCcb_t *pCcb, hciEvt_t *pEvent)
+{
+  hciLeSubrateChangeEvt_t evt;
+
+  /* call callback */
+  evt.hdr.event = DM_CONN_SUBRATE_CHANGE_IND;
+  evt.hdr.param = pCcb->connId;
+  evt.hdr.status = HCI_SUCCESS;
+
+  evt.status = pEvent->leSubrateChange.status;
+  evt.handle = pEvent->leSubrateChange.handle;
+  evt.subrateFactor = pEvent->leSubrateChange.subrateFactor;
+  evt.periphLatency = pEvent->leSubrateChange.periphLatency;
+  evt.contNum = pEvent->leSubrateChange.contNum;
+  evt.supTimeout = pEvent->leSubrateChange.supTimeout;
+
+  (*dmConnCb.connCback[DM_CLIENT_ID_APP])((dmEvt_t *) &evt);
+}
+#endif // BT_53
 
 /*************************************************************************************************/
 /*!
@@ -1764,3 +1818,30 @@ uint8_t DmConnRole(dmConnId_t connId)
 
   return dmConnCb.ccb[connId-1].role;
 }
+
+#if (BT_53)
+/*************************************************************************************************/
+/*!
+ *  \brief  Request LE Subrating of an open connection
+ *
+ *  \param  connId         Connection identifier.
+ *  \param  pSubrateParam  LE subrating parameters.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmConnSubrateReq(dmConnId_t connId, hciLeSubrateReq_t *pSubrateParam)
+{
+  dmConnApiSubrateReq_t *pMsg;
+
+  if ((pMsg = WsfMsgAlloc(sizeof(dmConnApiSubrateReq_t))) != NULL)
+  {
+    pMsg->hdr.event = DM_CONN_MSG_API_SUBRATE_REQ;
+    pMsg->hdr.param = connId;
+    memcpy(&pMsg->subrate, pSubrateParam, sizeof(hciLeSubrateReq_t));
+
+    WsfMsgSend(dmCb.handlerId, pMsg);
+  }
+}
+
+#endif // BT_53

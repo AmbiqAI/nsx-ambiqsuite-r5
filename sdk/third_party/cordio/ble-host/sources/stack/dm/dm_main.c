@@ -7,13 +7,13 @@
  *  Copyright (c) 2009-2018 Arm Ltd. All Rights Reserved.
  *
  *  Copyright (c) 2019-2020 Packetcraft, Inc.
- *  
+ *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
- *  
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- *  
+ *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -109,10 +109,6 @@ static const uint8_t dmHciToIdTbl[] =
   DM_ID_CONN_CTE,                               /* HCI_LE_CONN_CTE_REQ_ENABLE_CMD_CMPL_CBACK_EVT */
   DM_ID_CONN_CTE,                               /* HCI_LE_CONN_CTE_RSP_ENABLE_CMD_CMPL_CBACK_EVT */
   DM_ID_CONN_CTE,                               /* HCI_LE_READ_ANTENNA_INFO_CMD_CMPL_CBACK_EVT */
-  DM_ID_CIS,                                    /* HCI_CIS_EST_CBACK_EVT */
-  DM_ID_CIS,                                    /* HCI_CIS_REQ_CBACK_EVT */
-  DM_ID_REQ_SCA,                                /* HCI_REQ_PEER_SCA_CBACK_EVT */
-  DM_ID_CONN_CTE,                                /* HCI_LE_CONNLESS_IQ_REPORT_CBACK_EVT */
   DM_ID_CIS,                                    /* HCI_LE_CIS_EST_CBACK_EVT */
   DM_ID_CIS,                                    /* HCI_LE_CIS_REQ_CBACK_EVT */
   DM_ID_CIS,                                    /* HCI_CIS_DISCONNECT_CMPL_CBACK_EVT */
@@ -127,10 +123,17 @@ static const uint8_t dmHciToIdTbl[] =
   DM_ID_ISO,                                    /* HCI_READ_LOCAL_SUP_CTR_DLY_CMD_CMPL_CBACK_EVT */
   DM_ID_BIS,                                    /* HCI_LE_CREATE_BIG_CMPL_CBACK_EVT */
   DM_ID_BIS,                                    /* HCI_LE_TERM_BIG_CMPL_CBACK_EVT */
-  DM_ID_BIS_SYNC,                               /* HCI_LE_BIG_SYNC_EST_CBACK_EVT */   
+  DM_ID_BIS_SYNC,                               /* HCI_LE_BIG_SYNC_EST_CBACK_EVT */
   DM_ID_BIS_SYNC,                               /* HCI_LE_BIG_SYNC_LOST_CBACK_EVT */
   DM_ID_BIS_SYNC,                               /* HCI_LE_BIG_TERM_SYNC_CMPL_CBACK_EVT */
-  DM_ID_BIS_SYNC                                /* HCI_LE_BIG_INFO_ADV_REPORT_CBACK_EVT */
+  DM_ID_BIS_SYNC,                               /* HCI_LE_BIG_INFO_ADV_REPORT_CBACK_EVT */
+  DM_ID_CONN_CTE,                               /* HCI_LE_CONNLESS_IQ_REPORT_CBACK_EVT */
+#if (BT_53)
+  DM_ID_CONN_2,                                 /* HCI_LE_SUBRATE_CHANGE_CBACK_EVT */
+#endif // BT_53
+#if (BT_54)
+  DM_ID_ADV_PER,                                /* HCI_LE_PRE_ADV_SUBEVT_DATA_REQ_EVT */
+#endif // BT_54
 };
 
 /* DM callback event length table */
@@ -227,7 +230,15 @@ static const uint16_t dmEvtCbackLen[] =
   sizeof(wsfMsgHdr_t),                         /* DM_ERROR_IND */
   sizeof(hciHwErrorEvt_t),                     /* DM_HW_ERROR_IND */
   sizeof(hciVendorSpecEvt_t),                  /* DM_VENDOR_SPEC_IND */
-  sizeof(hciVendorSpecCmdCmplEvt_t)            /* DM_VENDOR_SPEC_CMD_CMPL_IND */
+  sizeof(hciVendorSpecCmdCmplEvt_t),           /* DM_VENDOR_SPEC_CMD_CMPL_IND */
+#if (BT_53)
+  sizeof(hciLeSubrateChangeEvt_t),             /* DM_CONN_SUBRATE_CHANGE_IND */
+#endif // BT_53
+#if (BT_54)
+  sizeof(hciLePerAdvSubevtDataReqEvt_t),  
+  sizeof(secCcmEncMsg_t),                      /* DM_EAD_ENC_CMPL_IND */
+  sizeof(secCcmDecMsg_t),                      /* DM_EAD_DEC_CMPL_IND */
+#endif // BT_54
 };
 
 /* Default component function inteface */
@@ -265,7 +276,10 @@ dmFcnIf_t *dmFcnIfTbl[DM_NUM_IDS] =
   (dmFcnIf_t *) &dmFcnDefault,                /* DM_ID_CIS_CIG */
   (dmFcnIf_t *) &dmFcnDefault,                /* DM_ID_BIS */
   (dmFcnIf_t *) &dmFcnDefault,                /* DM_ID_BIS_SYNC */
-  (dmFcnIf_t *) &dmFcnDefault                 /* DM_ID_ISO */
+  (dmFcnIf_t *) &dmFcnDefault,                /* DM_ID_ISO */
+#if (BT_54)
+  (dmFcnIf_t *) &dmFcnDefault,                /* DM_ID_EAD */
+#endif // BT_54  
 };
 
 /* Control block */
@@ -282,7 +296,7 @@ dmCb_t dmCb;
 /*************************************************************************************************/
 static void dmHciEvtCback(hciEvt_t *pEvent)
 {
-  WSF_ASSERT(pEvent->hdr.event <= HCI_LE_CONNLESS_IQ_REPORT_CBACK_EVT);
+  WSF_ASSERT(pEvent->hdr.event < HCI_LE_END_OF_CBACK_EVT);
 
   /* if DM not resetting or resetting but incoming event is HCI reset sequence complete event */
   if (!dmCb.resetting || (pEvent->hdr.event == HCI_RESET_SEQ_CMPL_CBACK_EVT))

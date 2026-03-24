@@ -2,9 +2,9 @@
 //
 //! @file am_devices_mspi_psram_aps25616n.h
 //!
-//! @brief APM DDR HEX and Octal SPI PSRAM driver.
+//! @brief Multi-bit SPI PSRAM driver for the APS25616N device.
 //!
-//! @addtogroup mspi_psram_aps25616n APS25616N MSPI PSRAM 1.8V Driver
+//! @addtogroup devices_mspi_psram_aps25616n APS25616N MSPI PSRAM Driver
 //! @ingroup devices
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5_2_a_1_1-c2486c8ef of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -128,7 +128,7 @@ typedef enum
     AM_DEVICES_MSPI_PSRAM_APS25616n_WLC_4,
     AM_DEVICES_MSPI_PSRAM_APS25616n_WLC_RSV5,
     AM_DEVICES_MSPI_PSRAM_APS25616n_WLC_6,
-}am_devices_mspi_psram_aps25616n_wlc_e;
+} am_devices_mspi_psram_aps25616n_wlc_e;
 
 typedef struct
 {

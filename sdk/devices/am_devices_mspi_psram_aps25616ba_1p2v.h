@@ -2,9 +2,9 @@
 //
 //! @file am_devices_mspi_psram_aps25616ba_1p2v.h
 //!
-//! @brief APM DDR HEX and Octal SPI PSRAM driver.
+//! @brief Multi-bit SPI PSRAM driver for the APS25616BA 1.2V device.
 //!
-//! @addtogroup mspi_psram_aps25616ba APS25616BA MSPI PSRAM 1.2V Driver
+//! @addtogroup devices_mspi_psram_aps25616ba_1p2v APS25616BA MSPI PSRAM Driver
 //! @ingroup devices
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5_2_a_1_1-c2486c8ef of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -185,7 +185,7 @@ typedef struct
         {
             uint8_t DENSITY         : 3;            //[0..2] Density                       |                                                                    |       non-volatile
             uint8_t GENERATION      : 2;            //[3..4] Generation                    |
-            uint8_t GB              : 3;            //[5..7] Good or bad                   |      others=bad, 3'b110=pass                                       |       non-volatile
+            uint8_t GBD             : 3;            //[5..7] Good or bad die               |      others=bad, 3'b110=pass                                       |       non-volatile
         }MR2_b;
     } ;
 

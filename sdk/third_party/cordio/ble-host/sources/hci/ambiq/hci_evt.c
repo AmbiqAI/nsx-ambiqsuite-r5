@@ -112,6 +112,9 @@ static void hciEvtParseLeSetConnCteRcvParm(hciEvt_t *pMsg, uint8_t *p, uint8_t l
 static void hciEvtParseLeSetConnCteTxParm(hciEvt_t *pMsg, uint8_t *p, uint8_t len);
 static void hciEvtParseLeConnCteReqEn(hciEvt_t *pMsg, uint8_t *p, uint8_t len);
 static void hciEvtParseLeConnCteRspEn(hciEvt_t *pMsg, uint8_t *p, uint8_t len);
+#if (BT_53)
+static void hciEvtParseLePerAdvSynTrRcv(uint8_t *p, uint8_t len);
+#endif // BT_53
 static void hciEvtParseLeCisEst(hciEvt_t *pMsg, uint8_t *p, uint8_t len);
 static void hciEvtParseLeCisReq(hciEvt_t *pMsg, uint8_t *p, uint8_t len);
 static void hciEvtParseLeReqPeerScaCmpl(hciEvt_t *pMsg, uint8_t *p, uint8_t len);
@@ -129,7 +132,14 @@ static void hciEvtParseLeBigSyncEst(hciEvt_t *pMsg, uint8_t *p, uint8_t len);
 static void hciEvtParseLeBigSyncLost(hciEvt_t *pMsg, uint8_t *p, uint8_t len);
 static void hciEvtParseLeBigTermSyncCmpl(hciEvt_t *pMsg, uint8_t *p, uint8_t len);
 static void hciEvtParseLeBigInfoAdvRpt(hciEvt_t *pMsg, uint8_t *p, uint8_t len);
+#if (BT_53)
+static void hciEvtParseLeSubrateChange(hciEvt_t *pMsg, uint8_t *p, uint8_t len);
+#endif // BT_53
 
+#if (BT_54)
+static void hciEvtParseLePerAdvSubevtDataReq(hciEvt_t *pMsg, uint8_t *p, uint8_t len);
+static void hciEvtProcessLePerAdvRspReport(uint8_t *p, uint8_t len);
+#endif // BT_54
 
 /**************************************************************************************************
   Local Variables
@@ -205,6 +215,7 @@ static const hciEvtParse_t hciEvtParseFcnTbl[] =
   hciEvtParseLeSetConnCteTxParm,
   hciEvtParseLeConnCteReqEn,
   hciEvtParseLeConnCteRspEn,
+  NULL,
   hciEvtParseLeCisEst,
   hciEvtParseLeCisReq,
   hciEvtParseDisconnectCmpl,
@@ -222,7 +233,16 @@ static const hciEvtParse_t hciEvtParseFcnTbl[] =
   hciEvtParseLeBigSyncEst,
   hciEvtParseLeBigSyncLost,
   hciEvtParseLeBigTermSyncCmpl,
-  hciEvtParseLeBigInfoAdvRpt
+  hciEvtParseLeBigInfoAdvRpt,
+  NULL,
+#if (BT_53)
+  hciEvtParseLeSubrateChange,
+#endif // BT_53
+
+#if (BT_54)
+  hciEvtParseLePerAdvSubevtDataReq,
+  NULL,
+#endif // BT_54
 };
 
 /* HCI event structure length table, indexed by internal callback event value */
@@ -297,6 +317,7 @@ static const uint8_t hciEvtCbackLen[] =
   sizeof(hciLeSetConnCteTxParamsCmdCmplEvt_t),
   sizeof(hciLeConnCteReqEnableCmdCmplEvt_t),
   sizeof(hciLeConnCteRspEnableCmdCmplEvt_t),
+  sizeof(wsfMsgHdr_t),
   sizeof(HciLeCisEstEvt_t),
   sizeof(HciLeCisReqEvt_t),
   sizeof(hciDisconnectCmplEvt_t),
@@ -314,7 +335,15 @@ static const uint8_t hciEvtCbackLen[] =
   sizeof(HciLeBigSyncEstEvt_t),
   sizeof(HciLeBigSyncLostEvt_t),
   sizeof(HciLeBigTermSyncCmplEvt_t),
-  sizeof(HciLeBigInfoAdvRptEvt_t)
+  sizeof(HciLeBigInfoAdvRptEvt_t),
+  sizeof(wsfMsgHdr_t),
+#if (BT_53)
+  sizeof(hciLeSubrateChangeEvt_t),
+#endif // BT_53
+
+#if (BT_54)
+  sizeof(hciLePerAdvSubevtDataReqEvt_t),
+#endif // BT_54
 };
 
 /* Global event statistics. */
@@ -381,6 +410,11 @@ static void hciEvtParseLeEnhancedConnCmpl(hciEvt_t *pMsg, uint8_t *p, uint8_t le
   BSTREAM_TO_UINT16(pMsg->leConnCmpl.supTimeout, p);
   BSTREAM_TO_UINT8(pMsg->leConnCmpl.clockAccuracy, p);
 
+#if (BT_54)
+  BSTREAM_TO_UINT8(pMsg->leConnCmpl.advHandle, p);
+  BSTREAM_TO_UINT16(pMsg->leConnCmpl.syncHandle, p);
+  pMsg->leConnCmpl.syncHandle &= 0x0FFF;   // 12 bits meaningful
+#endif // BT_54
   pMsg->hdr.param = pMsg->leConnCmpl.handle;
   pMsg->hdr.status = pMsg->leConnCmpl.status;
 }
@@ -1526,6 +1560,12 @@ static void hciEvtParseLePerAdvSyncEst(hciEvt_t *pMsg, uint8_t *p, uint8_t len)
   BSTREAM_TO_UINT16(pMsg->lePerAdvSyncEst.perAdvInterval, p);
   BSTREAM_TO_UINT8(pMsg->lePerAdvSyncEst.clockAccuracy, p);
 
+#if (BT_54)
+  BSTREAM_TO_UINT8(pMsg->lePerAdvSyncEst.numSubEvt, p);
+  BSTREAM_TO_UINT8(pMsg->lePerAdvSyncEst.subEvtInt, p);
+  BSTREAM_TO_UINT8(pMsg->lePerAdvSyncEst.rspSlotDelay, p);
+  BSTREAM_TO_UINT8(pMsg->lePerAdvSyncEst.rspSlotSpacing, p);
+#endif // BT_54
   pMsg->hdr.status = pMsg->lePerAdvSyncEst.status;
 }
 
@@ -1566,7 +1606,11 @@ static void hciEvtProcessLePerAdvReport(uint8_t *p, uint8_t len)
     BSTREAM_TO_UINT16(pMsg->syncHandle, p);
     BSTREAM_TO_UINT8(pMsg->txPower, p);
     BSTREAM_TO_UINT8(pMsg->rssi, p);
-    BSTREAM_TO_UINT8(pMsg->unused, p);
+    BSTREAM_TO_UINT8(pMsg->cteType, p);
+#if (BT_54)
+    BSTREAM_TO_UINT16(pMsg->evtCnt, p);
+    BSTREAM_TO_UINT8(pMsg->subEvt, p);
+#endif // BT_54
     BSTREAM_TO_UINT8(pMsg->status, p);
     BSTREAM_TO_UINT8(pMsg->len, p);
 
@@ -1872,6 +1916,53 @@ static void hciEvtProcessLeDirectAdvReport(uint8_t *p, uint8_t len)
     /* free buffer */
     WsfBufFree(pMsg);
   }
+}
+
+/*************************************************************************************************/
+/*!
+ *  \fn     hciEvtParseLePerAdvSynTrRcv
+ *
+ *  \brief  Process an HCI LE periodic advertising sync transfer received event.
+ *
+ *  \param  p    Buffer containing HCI event, points to start of parameters.
+ *  \param  len  Parameter byte stream length.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+static void hciEvtParseLePerAdvSynTrRcv(uint8_t *p, uint8_t len)
+{
+    HciLePerAdvSyncTrsfRcvdEvt_t *pMsg;
+
+    if ((pMsg = WsfBufAlloc(sizeof(HciLePerAdvSyncTrsfRcvdEvt_t))) != NULL)
+    {
+        APP_TRACE_INFO0("Le Periodic Adv Sync Transfer Rcvd");
+        BSTREAM_TO_UINT8(pMsg->status, p);
+        BSTREAM_TO_UINT16(pMsg->connHandle, p);
+        BSTREAM_TO_UINT16(pMsg->serviceData, p);
+        BSTREAM_TO_UINT16(pMsg->syncHandle, p);
+        BSTREAM_TO_UINT8(pMsg->advSid, p);
+        BSTREAM_TO_UINT8(pMsg->advAddrType, p);
+        BSTREAM_TO_BDA(pMsg->advAddr, p);
+
+        BSTREAM_TO_UINT8(pMsg->advPhy, p);
+        BSTREAM_TO_UINT16(pMsg->perAdvInterval, p);
+        BSTREAM_TO_UINT8(pMsg->clockAccuracy, p);
+#if (BT_54)
+        BSTREAM_TO_UINT8(pMsg->numSubEvt, p);
+        BSTREAM_TO_UINT8(pMsg->subEvtInt, p);
+        BSTREAM_TO_UINT8(pMsg->rspSlotDelay, p);
+        BSTREAM_TO_UINT8(pMsg->rspSlotSpacing, p);
+#endif // BT_54
+        pMsg->hdr.status = pMsg->status;
+        pMsg->hdr.event = HCI_LE_PER_SYNC_TRSF_RCVD_CBACK_EVT;
+
+        /* execute callback */
+        (*hciCb.evtCback)((hciEvt_t *) pMsg);
+
+        /* free buffer */
+        WsfBufFree(pMsg);
+    }
 }
 
 /*************************************************************************************************/
@@ -2356,6 +2447,138 @@ static void hciEvtParseLeBigInfoAdvRpt(hciEvt_t *pMsg, uint8_t *p, uint8_t len)
   pMsg->hdr.param = pMsg->leBigInfoAdvRpt.syncHandle;
 }
 
+#if (BT_53)
+/*************************************************************************************************/
+/*!
+ *  \brief  Parse an HCI LE subrate change event.
+ *
+ *  \param  pMsg    Pointer to output event message structure.
+ *  \param  p       Pointer to input HCI event parameter byte stream.
+ *  \param  len     Parameter byte stream length.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+static void hciEvtParseLeSubrateChange(hciEvt_t *pMsg, uint8_t *p, uint8_t len)
+{
+  BSTREAM_TO_UINT8(pMsg->leSubrateChange.status, p);
+  BSTREAM_TO_UINT16(pMsg->leSubrateChange.handle, p);
+  BSTREAM_TO_UINT16(pMsg->leSubrateChange.subrateFactor, p);
+  BSTREAM_TO_UINT16(pMsg->leSubrateChange.periphLatency, p);
+  BSTREAM_TO_UINT16(pMsg->leSubrateChange.contNum, p);
+  BSTREAM_TO_UINT16(pMsg->leSubrateChange.supTimeout, p);
+
+  pMsg->hdr.status = pMsg->leSubrateChange.status;
+  pMsg->hdr.param = pMsg->leSubrateChange.handle;
+}
+#endif // BT_53
+
+#if (BT_54)
+/*************************************************************************************************/
+/*!
+ *  \brief  Parse an HCI LE Periodic Advertising Subevent Data Request event.
+ *
+ *  \param  pMsg    Pointer to output event message structure.
+ *  \param  p       Pointer to input HCI event parameter byte stream.
+ *  \param  len     Parameter byte stream length.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+static void hciEvtParseLePerAdvSubevtDataReq(hciEvt_t *pMsg, uint8_t *p, uint8_t len)
+{
+  BSTREAM_TO_UINT8(pMsg->lePerAdvSubevtDataReq.advHandle, p);
+  BSTREAM_TO_UINT8(pMsg->lePerAdvSubevtDataReq.subevtStart, p);
+  BSTREAM_TO_UINT8(pMsg->lePerAdvSubevtDataReq.subevtDataCnt, p);
+
+  pMsg->hdr.param = pMsg->lePerAdvSubevtDataReq.advHandle;
+}
+
+
+/*************************************************************************************************/
+/*!
+ *  \fn     hciEvtProcessLePerAdvRspReport
+ *
+ *  \brief  Process an HCI LE periodic advertising response report.
+ *
+ *  \param  p    Buffer containing HCI event, points to start of parameters.
+ *  \param  len  Parameter byte stream length.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+static void hciEvtProcessLePerAdvRspReport(uint8_t *p, uint8_t len)
+{
+  hciLePerAdvRspReportEvt_t *pMsg;
+  uint8_t                i;
+  uint8_t                *ptr;
+  uint8_t                maxLen;
+  uint8_t                dataLen;
+
+  /* get number of response */
+  i = *(p+3);
+
+  HCI_TRACE_INFO1("HCI Periodic Adv report, num reports: %d", i);
+
+  ptr = p;
+  maxLen = 0;
+
+  /* find out max length ext adv/scan rsp data */
+  while (i-- > 0)
+  {
+    ptr += HCI_PER_ADV_RSP_RPT_DATA_LEN_OFFSET;
+    BSTREAM_TO_UINT8(dataLen, ptr);
+    ptr += dataLen;
+
+    /* if len greater than max len seen so far */
+    if (dataLen > maxLen)
+    {
+      /* update max len */
+      maxLen = dataLen;
+    }
+  }
+
+  if ((pMsg = WsfBufAlloc(sizeof(hciLePerAdvRspReportEvt_t) + maxLen)) != NULL)
+  {
+    BSTREAM_TO_UINT8(pMsg->advHandle, p);
+    BSTREAM_TO_UINT8(pMsg->subEvent, p);
+    BSTREAM_TO_UINT8(pMsg->txStatus, p);
+    BSTREAM_TO_UINT8(pMsg->numResponses, p);
+
+    /* get number of response */
+    i = pMsg->numResponses;
+
+    /* parse each report and execute callback */
+    while (i-- > 0)
+    {
+      BSTREAM_TO_INT8(pMsg->perAdvRsp.txPower, p);
+      BSTREAM_TO_INT8(pMsg->perAdvRsp.rssi, p);
+      BSTREAM_TO_UINT8(pMsg->perAdvRsp.cteType, p);
+      BSTREAM_TO_UINT8(pMsg->perAdvRsp.rspSlot, p);
+      BSTREAM_TO_UINT8(pMsg->perAdvRsp.dataStatus, p);
+      BSTREAM_TO_INT8(pMsg->perAdvRsp.dataLen, p);
+
+      HCI_TRACE_INFO1("HCI Periodic Adv rsp report, data len: %d", pMsg->perAdvRsp.dataLen);
+
+      /* Copy data to space after end of report struct */
+      pMsg->perAdvRsp.pData = (uint8_t *)(pMsg + 1);
+      memcpy(pMsg->perAdvRsp.pData, p, pMsg->perAdvRsp.dataLen);
+      p += pMsg->perAdvRsp.dataLen;
+
+      /* initialize message header */
+      pMsg->hdr.param = 0;
+      pMsg->hdr.event = HCI_LE_PER_ADV_RSP_REPORT_CBACK_EVT;
+      pMsg->hdr.status = 0;
+
+      /* execute callback */
+      (*hciCb.evtCback)((hciEvt_t *)pMsg);
+    }
+
+    /* free buffer */
+    WsfBufFree(pMsg);
+  }
+}
+#endif // BT_54
 /*************************************************************************************************/
 /*!
  *  \fn     hciEvtCmdStatusFailure
@@ -2756,6 +2979,9 @@ void hciEvtProcessMsg(uint8_t *pEvt)
           break;
 
         case HCI_LE_ENHANCED_CONN_CMPL_EVT:
+        #if (BT_54)
+        case HCI_LE_ENHANCED_CONN_CMPL_EVT_V2:
+        #endif // BT_54
           /* if connection created successfully */
           if (*pEvt == HCI_SUCCESS)
           {
@@ -2810,10 +3036,16 @@ void hciEvtProcessMsg(uint8_t *pEvt)
           break;
 
         case HCI_LE_PER_ADV_SYNC_EST_EVT:
+        #if (BT_54)
+        case HCI_LE_PER_ADV_SYNC_EST_EVT_V2:
+        #endif
           cbackEvt = HCI_LE_PER_ADV_SYNC_EST_CBACK_EVT;
           break;
 
         case HCI_LE_PER_ADV_REPORT_EVT:
+        #if (BT_54)
+        case HCI_LE_PER_ADV_REPORT_EVT_V2:
+        #endif // BT_54
           /* special case for periodic advertising report */
           hciEvtProcessLePerAdvReport(pEvt, len);
           break;
@@ -2834,6 +3066,13 @@ void hciEvtProcessMsg(uint8_t *pEvt)
           /* special case for LE Connectionless IQ report */
           hciEvtProcessLeConlessIQReport(pEvt, len);
 
+          break;
+
+        case HCI_LE_PER_SYNC_TRSF_RCVD_EVT:
+        #if (BT_54)
+        case HCI_LE_PER_SYNC_TRSF_RCVD_EVT_V2:
+        #endif // BT_54
+           hciEvtParseLePerAdvSynTrRcv(pEvt, len);
           break;
 
         case HCI_LE_CIS_EST_EVT:
@@ -2873,6 +3112,23 @@ void hciEvtProcessMsg(uint8_t *pEvt)
         case HCI_LE_BIG_INFO_ADV_REPORT_EVT:
           cbackEvt = HCI_LE_BIG_INFO_ADV_REPORT_CBACK_EVT;
           break;
+
+#if (BT_53)
+        case HCI_LE_SUBRATE_CHANGE_EVT:
+          cbackEvt = HCI_LE_SUBRATE_CHANGE_CBACK_EVT;
+          break;
+#endif // BT_53
+
+#if (BT_54)
+        case HCI_LE_PRE_ADV_SUBEVT_DATA_REQ_EVT:
+          cbackEvt = HCI_LE_PER_ADV_SUBEVT_DATA_REQ_CBACK_EVT;
+          break;
+
+        case HCI_LE_PER_ADV_RSP_REPORT_EVT:
+          /* special case for periodic advertising response report */
+          hciEvtProcessLePerAdvRspReport(pEvt, len);
+          break;
+#endif // BT_54
 
         default:
           break;

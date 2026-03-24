@@ -22,6 +22,14 @@
  */
 /*************************************************************************************************/
 
+/* Ingore the "initializer element is not a constant expression" warning
+ * with -Wpedantic option enabled.
+ */
+#if defined ( __GNUC__ )
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+
 #include <string.h>
 #include "wsf_types.h"
 #include "wsf_os.h"

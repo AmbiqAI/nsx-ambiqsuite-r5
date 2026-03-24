@@ -5,9 +5,6 @@ local_src += $(wildcard $(subdirectory)/src/*.s)
 ifeq ($(USB_PRESENT),1)
 local_src += $(wildcard $(subdirectory)/src/usb/*.c)
 endif
-ifeq ($(BLE_PRESENT),1)
-local_src += $(wildcard $(subdirectory)/src/ble/*.c)
-endif
 
 # $(info local_src is $(local_src))
 # $(info part is $(PART))
@@ -15,8 +12,10 @@ endif
 # ifeq ($(PLATFORM),apollo5a_eb)
 # includes_api += $(subdirectory)/boards/apollo5_eb/bsp
 # else
-includes_api += $(subdirectory)/boards/$(PLATFORM)/bsp
+
+# Include /src first so any duplicates are resolved in favor of the local version.
 includes_api += $(subdirectory)/src
+includes_api += $(subdirectory)/boards/$(PLATFORM)/bsp
 # endif
 # includes_api += $(subdirectory)/CMSIS/ARM/Include
 includes_api += $(subdirectory)/CMSIS/AmbiqMicro/Include

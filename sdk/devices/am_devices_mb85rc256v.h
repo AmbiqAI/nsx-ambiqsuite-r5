@@ -2,9 +2,9 @@
 //
 //! @file am_devices_mb85rc256v.h
 //!
-//! @brief Fujitsu 256K I2C FRAM driver.
+//! @brief Device driver for Fujitsu MB85RC256V peripheral.
 //!
-//! @addtogroup mb85rc256v MB85RC256V I2C FRAM driver
+//! @addtogroup devices_mb85rc256v Fujitsu MB85RC256V Device Driver
 //! @ingroup devices
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5_2_a_1_1-c2486c8ef of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
