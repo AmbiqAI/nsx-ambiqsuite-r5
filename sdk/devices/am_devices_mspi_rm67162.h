@@ -1,10 +1,10 @@
 //*****************************************************************************
 //
-//! @file am_devices_mspi_rm67162.c
+//! @file am_devices_mspi_rm67162.h
 //!
-//! @brief Generic Raydium TFT display driver.
+//! @brief Multi-bit SPI Display driver for the RM67162 display panel.
 //!
-//! @addtogroup mspi_rm67162 RM67162 MSPI Display Driver
+//! @addtogroup devices_mspi_rm67162 RM67162 MSPI Display Driver
 //! @ingroup devices
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 

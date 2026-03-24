@@ -184,6 +184,18 @@ typedef struct
   uint8_t     maxAttempts;                     /*!< \brief Number of update attempts before giving up */
 } appUpdateCfg_t;
 
+#if (BT_53)
+/*! \brief Configurable parameters for LE subrate parameter update */
+typedef struct
+{
+  uint16_t    subrateMin;                      /*!< \brief Minimum Subrate Factor. */
+  uint16_t    subrateMax;                      /*!< \brief Maximum Subrate Factor. */
+  uint16_t    maxLatency;                      /*!< \brief Maximum Peripheral latency. */
+  uint16_t    contNum;                         /*!< \brief Continuation number. */
+  uint16_t    supTimeout;                      /*!< \brief Supervision timeout. */
+} appSubrateCfg_t;
+#endif // BT_53
+
 /*! \brief Configurable parameters for incoming request actions */
 typedef struct
 {
@@ -265,6 +277,13 @@ extern appSecCfg_t *pAppSecCfg;
  *  The application must set this variable during system initialization.
  */
 extern appUpdateCfg_t *pAppUpdateCfg;
+
+#if (BT_53)
+/*! \brief This is a pointer to the subrate parameter update parameters used by the application.
+ *  The application must set this variable during system initialization.
+ */
+extern appSubrateCfg_t *pAppSubrateCfg;
+#endif // BT_53
 
 /*! \brief This is a pointer to the discovery parameters used by the application.  The application
  *  must set this variable during system initialization.
@@ -600,6 +619,19 @@ void AppPerAdvStop(uint8_t advHandle);
  */
 /*************************************************************************************************/
 bool_t AppPerAdvSetAdValue(uint8_t advHandle, uint8_t adType, uint8_t len, uint8_t *pValue);
+
+#if (BT_53)
+/*************************************************************************************************/
+/*!
+ *  \brief  Update periodic advertising Data ID(DID)
+ *
+ *  \param  advHandle Advertising handle.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void AppUpdatePerAdvDid(uint8_t advHandle);
+#endif // BT_53
 
 /**@}*/
 

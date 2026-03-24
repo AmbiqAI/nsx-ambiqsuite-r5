@@ -114,6 +114,7 @@ void hciCoreNumCmplPkts(uint8_t *pMsg)
 /*************************************************************************************************/
 void hciCoreRecv(uint8_t msgType, uint8_t *pCoreRecvMsg)
 {
+  HCI_TRACE_INFO1("hciCoreRecv msgType 0x%x", msgType);
   /* dump event for protocol analysis */
   if (msgType == HCI_EVT_TYPE)
   {
@@ -132,7 +133,9 @@ void hciCoreRecv(uint8_t msgType, uint8_t *pCoreRecvMsg)
   WsfMsgEnq(&hciCb.rxQueue, (wsfHandlerId_t) msgType, pCoreRecvMsg);
 
   /* set event */
+  HCI_TRACE_INFO0("hciCoreRecv WsfSetEvent");
   WsfSetEvent(hciCb.handlerId, HCI_EVT_RX);
+  HCI_TRACE_INFO0("hciCoreRecv WsfSetEvent returned");
 }
 
 /*************************************************************************************************/
@@ -151,19 +154,21 @@ void HciCoreHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
 {
   uint8_t         *pBuf;
   wsfHandlerId_t  handlerId;
-  
+  HCI_TRACE_INFO1("HciCoreHandler *pMsg 0x%x", pMsg);
   /* Handle message */
   if (pMsg != NULL)
   {
     /* Handle HCI command timeout */
     if (pMsg->event == HCI_MSG_CMD_TIMEOUT)
     {
+      HCI_TRACE_INFO0("hciCmdTimeout");
       hciCmdTimeout(pMsg);
     }
   }
   /* Handle events */
   else if (event & HCI_EVT_RX)
   {
+    HCI_TRACE_INFO0("Process rx queue");
     /* Process rx queue */
     while ((pBuf = WsfMsgDeq(&hciCb.rxQueue, &handlerId)) != NULL)
     {
@@ -172,15 +177,16 @@ void HciCoreHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
       {
         /* Parse/process events */
         hciEvtProcessMsg(pBuf);
-
+        HCI_TRACE_INFO0("hciEvtProcessMsg returned");
         /* Handle events during reset sequence */
         if (hciCb.resetting)
         {
           hciCoreResetSequence(pBuf);
         }
-        
+        HCI_TRACE_INFO0("hciCoreResetSequence returned");
         /* Free buffer */
         WsfMsgFree(pBuf);
+        HCI_TRACE_INFO0("WsfMsgFree returned");
       }
       /* Handle ACL data */
       else if (handlerId == HCI_ACL_TYPE)

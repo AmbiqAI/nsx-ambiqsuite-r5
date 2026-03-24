@@ -103,10 +103,30 @@ const uint8_t hciLeEventMask[HCI_LE_EVT_MASK_LEN] =
   HCI_EVT_MASK_LE_CH_SEL_ALGO_EVT|                /* Byte 2 */
   HCI_EVT_MASK_LE_CONNLESS_IQ_REPORT_EVT|         /* Byte 2 */
   HCI_EVT_MASK_LE_CONN_IQ_REPORT_EVT|             /* Byte 2 */
-  HCI_EVT_MASK_LE_CTE_REQ_FAILED_EVT,             /* Byte 2 */
+  HCI_EVT_MASK_LE_CTE_REQ_FAILED_EVT              /* Byte 2 */
+#if (BT_53)
+  |HCI_EVT_MASK_LE_PER_SYNC_TRSF_RCVT_EVT         /* Byte 2 */
+#endif // BT_53
+  ,
   0,                                              /* Byte 3 */
+
+#if (BT_53)
+  HCI_EVT_MASK_LE_SUBRATE_CHANGE_EVT              /* Byte 4 */
+#if (BT_54)
+    | HCI_EVT_MASK_LE_PER_ADV_SYNC_EST_EVT_V2     /* Byte 4 */
+    | HCI_EVT_MASK_LE_PER_ADV_REPORT_EVT_V2       /* Byte 4 */
+    | HCI_EVT_MASK_LE_PER_SYNC_TRSF_RCVT_EVT_V2   /* Byte 4 */
+    | HCI_EVT_MASK_LE_PER_ADV_SUBEVT_DATA_REQ_EVT /* Byte 4 */
+    | HCI_EVT_MASK_LE_PER_ADV_RSP_REP_EVT
+#endif // BT_54
+  ,
+#else
   0,                                              /* Byte 4 */
-  0,                                              /* Byte 5 */
+#endif // BT_53
+
+#if (BT_54)
+  HCI_EVT_MASK_LE_ENHANCED_CONN_CMPL_EVT_V2,                                              /* Byte 5 */
+#endif // BT_54
   0,                                              /* Byte 6 */
   0                                               /* Byte 7 */
 };
@@ -138,7 +158,12 @@ uint64_t hciLeSupFeatCfg =
   HCI_LE_SUP_FEAT_STABLE_MOD_IDX_TRANSMITTER |    /* Stable Modulation Index - Transmitter supported */
   HCI_LE_SUP_FEAT_STABLE_MOD_IDX_RECEIVER    |    /* Stable Modulation Index - Receiver supported */
   HCI_LE_SUP_FEAT_LE_EXT_ADV                 |    /* LE Extended Advertising */
-  HCI_LE_SUP_FEAT_LE_PER_ADV;                     /* LE Periodic Advertising */
+  HCI_LE_SUP_FEAT_LE_PER_ADV                      /* LE Periodic Advertising */
+#if (BT_53)
+  | HCI_LE_SUP_FEAT_SUBRATING                     /* LE Subrating */
+  | HCI_LE_SUP_FEAT_SUBRATING_HOST_SUPPORT        /* LE Subrating host support */
+#endif // BT_53
+;
 
 /**************************************************************************************************
   Global Variables
@@ -907,9 +932,9 @@ void HciResetSequence(void)
 
   /* set resetting state */
   hciCb.resetting = TRUE;
-  HCI_TRACE_INFO0("reset sequence 2");
 
   /* start the reset sequence */
+  HCI_TRACE_INFO0("hciCoreResetStart");
   hciCoreResetStart();
 }
 

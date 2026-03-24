@@ -2,9 +2,9 @@
 //
 //! @file am_hal_usb.h
 //!
-//! @brief
+//! @brief Functions for USB module
 //!
-//! @addtogroup usb USB Functionality
+//! @addtogroup usb_ap510 USB Functionality
 //! @ingroup apollo510_hal
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -1038,6 +1038,31 @@ extern uint32_t am_hal_usb_intr_status_get(void *pHandle, uint32_t *ui32IntrUsbS
 //*****************************************************************************
 extern void am_hal_usb_interrupt_service(void *pHandle, uint32_t ui32IntrUsbStatus, uint32_t ui32IntrInStatus, uint32_t ui32IntrOutStatus,
                                         uint32_t ui32IntrDMAStatus, uint32_t ui32IntrAutoDMAStatus);
+
+//****************************************************************************
+//
+//! @brief Macro to read and handle USB interrupts
+//!
+//! Application / USB stack can either call this macro, or implement its custom
+//! handling when usb isr is received
+//
+//****************************************************************************
+#define am_hal_usb_handle_isr(pHandle)                  \
+    {                                                   \
+        uint32_t int_status[5];                         \
+        am_hal_usb_intr_status_get(pHandle,             \
+                                    &int_status[0],     \
+                                    &int_status[1],     \
+                                    &int_status[2],     \
+                                    &int_status[3],     \
+                                    &int_status[4]);    \
+        am_hal_usb_interrupt_service(pHandle,           \
+                                     int_status[0],     \
+                                     int_status[1],     \
+                                     int_status[2],     \
+                                     int_status[3],     \
+                                     int_status[4]);    \
+    }
 
 //*****************************************************************************
 //

@@ -643,7 +643,7 @@ void attcMsgCback(attcApiMsg_t *pMsg)
 {
   attcCcb_t   *pCcb;
 
-  ATT_TRACE_INFO2("attcMsgCback: msg: %#x slot: %#x", pMsg->hdr.event, pMsg->slot);
+  ATT_TRACE_INFO2("attcMsgCback: msg: %x slot: %x", pMsg->hdr.event, pMsg->slot);
 
   /* if signed data event */
   if ((pMsg->hdr.event >= ATTC_MSG_API_SIGNED_WRITE_CMD) && (pMsg->hdr.event <= ATTC_MSG_CMAC_CMPL))

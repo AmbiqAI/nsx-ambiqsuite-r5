@@ -4,7 +4,7 @@
 //!
 //! @brief Functions for interfacing with the MSPI.
 //!
-//! @addtogroup mspi4 MSPI - Multi-bit SPI
+//! @addtogroup mspi4_ap510 MSPI - Multi-bit SPI
 //! @ingroup apollo510_hal
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef AM_HAL_MSPI_H
@@ -504,10 +504,6 @@ typedef enum
     AM_HAL_MSPI_REQ_XIPACK,
     // Set CE Latency. Pass am_hal_mspi_ce_latency_e * as pConfig.
     AM_HAL_MSPI_REQ_CE_LATENCY,
-    // New(125MHz) DDR mode Disable
-    AM_HAL_MSPI_REQ_NEW_DDR_DIS,
-    // New(125MHz) DDR mode Enable
-    AM_HAL_MSPI_REQ_NEW_DDR_EN,
     // DDR Disable
     AM_HAL_MSPI_REQ_DDR_DIS,
     // DDR Enable
@@ -570,6 +566,10 @@ typedef enum
     AM_HAL_MSPI_REQ_NAND_FLASH_SENDADDR_EN,
     // Set MSPI CPU read combining scheme
     AM_HAL_MSPI_REQ_CPU_READ_COMBINE,
+    // Set scrambling config
+    AM_HAL_MSPI_REQ_SCRAMBLE_CONFIG,
+    // Set write latency and turnaround
+    AM_HAL_MSPI_REQ_SET_DATA_LATENCY,
 
     AM_HAL_MSPI_REQ_MAX
 }
@@ -726,9 +726,6 @@ typedef struct
 
     //! Emulate DDR mode.
     bool                        bEmulateDDR;
-
-    //! New(125MHz) DDR mode.
-    bool                        bNewDDR;
 
     //! CE latency.
     am_hal_mspi_ce_latency_e    eCeLatency;

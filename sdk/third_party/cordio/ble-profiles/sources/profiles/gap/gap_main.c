@@ -42,6 +42,29 @@ static const attcDiscChar_t gapCar =
   0
 };
 
+#if (BT_54)
+/*! Encrypted Data Key Material */
+static const attcDiscChar_t gapEdkm =
+{
+  attEdkmChUuid,
+  ATTC_SET_REQUIRED
+};
+
+/*! Encrypted Data Key Material CCC descriptor */
+static const attcDiscChar_t gapEdkmCcc =
+{
+  attCliChCfgUuid,
+  ATTC_SET_REQUIRED | ATTC_SET_DESCRIPTOR
+};
+
+/*! LE GATT Security Levels */
+static const attcDiscChar_t gapSeclvl =
+{
+  attSeclvlChUuid,
+  ATTC_SET_REQUIRED
+};
+#endif // BT_54
+
 /*! Resolvable Private Address Only */
 static const attcDiscChar_t gapRpao =
 {
@@ -53,6 +76,11 @@ static const attcDiscChar_t gapRpao =
 static const attcDiscChar_t *gapDiscCharList[] =
 {
   &gapCar,                   /* Central Address Resolution */
+#if (BT_54)
+  &gapEdkm,                  /* Encrypted Data Key Material */
+  &gapEdkmCcc,               /* Encrypted Data Key Material CCC descriptor */
+  &gapSeclvl,                /* LE GATT Security Levels */
+#endif // BT_54
   &gapRpao                   /* Resolvable Private Address Only */
 };
 

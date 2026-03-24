@@ -2,13 +2,13 @@
 //
 //! @file am_devices_chsc5816_ap5.h
 //!
-//! @brief General I2C touch driver.
+//! @brief Functions for controlling the CHSC581 touch sensor device (Apollo5).
 //!
-//! @addtogroup chsc5816 CHSC5816 - I2C Touch Driver
+//! @addtogroup devices_chsc5816_ap5 CHSC5816 - I2C Touch Driver (Apollo510)
 //! @ingroup devices
 //! @{
 //
-//**************************************************************************
+//*****************************************************************************
 
 //*****************************************************************************
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -115,7 +115,7 @@ enum SEMI_DRV_ERR
 #define AM_DEVICES_CHSC5816_READ_DATA_BLOCK           (0x2000002C)
 #define AM_DEVICES_CHSC5816_I2C_WR                    0x0000
 #define AM_DEVICES_CHSC5816_I2C_RD                    (1u << 0)
-#define CHSC5816_SLAVE_ADDR                           0x2E
+#define AM_DEVICES_CHSC5816_DEVICE_ADDR               0x2E
 
 enum CMD_TYPE_ID
 {

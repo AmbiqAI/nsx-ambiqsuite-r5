@@ -2,9 +2,9 @@
 //
 //! @file am_devices_spiflash.h
 //!
-//! @brief Generic spiflash driver.
+//! @brief Generic SPI Flash driver.
 //!
-//! @addtogroup spiflash SPI FLASH Driver
+//! @addtogroup devices_spiflash Generic SPI Flash Driver
 //! @ingroup devices
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 

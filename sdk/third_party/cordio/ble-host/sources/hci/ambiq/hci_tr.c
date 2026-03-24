@@ -104,7 +104,7 @@ uint16_t hciTrSendAclData(void *pContext, uint8_t *pData)
 bool_t hciTrSendCmd(uint8_t *pData)
 {
   uint16_t   len;  // in case like LE set periodic advertising data, the maximum HCI command parameter length is 255
-
+  HCI_TRACE_INFO0("hciTrSendCmd");
   /* get length */
   len = pData[2] + HCI_CMD_HDR_LEN;
 
@@ -145,16 +145,18 @@ uint16_t hciTrSerialRxIncoming(uint8_t *pBuf, uint16_t len)
   uint16_t  received_bytes = len;
 
   consumed_bytes = 0;
+  HCI_TRACE_INFO1("hciTrSerialRxIncoming len 0x%x", len);
   /* loop until all bytes of incoming buffer are handled */
   while (len)
   {
     /* read single byte from incoming buffer and advance to next byte */
     dataByte = *pBuf;
-
+    HCI_TRACE_INFO3("hciTrSerialRxIncoming dataByte 0x%x, len 0x%x stateRx 0x%x", dataByte, len, stateRx);
     /* --- Idle State --- */
     if (stateRx == HCI_RX_STATE_IDLE)
     {
       /* save the packet type */
+      HCI_TRACE_INFO1("hciTrSerialRxIncoming switch state to header pktIndRx 0x%x", pktIndRx);
       pktIndRx = dataByte;
       iRx      = 0;
       stateRx  = HCI_RX_STATE_HEADER;
@@ -184,9 +186,10 @@ uint16_t hciTrSerialRxIncoming(uint8_t *pBuf, uint16_t len)
         /* invalid packet type, discard this packet */
         stateRx = HCI_RX_STATE_IDLE;
         consumed_bytes = received_bytes;
+        HCI_TRACE_INFO1("hciTrSerialRxIncoming invalid packet type, discard this packet consumed_bytes 0x%x", consumed_bytes);
         return consumed_bytes;
       }
-
+      HCI_TRACE_INFO2("hciTrSerialRxIncoming iRx 0x%x hdrLen 0x%x", iRx, hdrLen);
       if (iRx != hdrLen) {
         /* copy current byte into the temp header buffer */
         hdrRx[iRx++] = dataByte;
@@ -194,7 +197,7 @@ uint16_t hciTrSerialRxIncoming(uint8_t *pBuf, uint16_t len)
         consumed_bytes++;
         len--;
       }
-
+      HCI_TRACE_INFO2("hciTrSerialRxIncoming2 iRx 0x%x hdrLen 0x%x", iRx, hdrLen);
       /* see if entire header has been read */
       if (iRx == hdrLen)
       {
@@ -207,7 +210,7 @@ uint16_t hciTrSerialRxIncoming(uint8_t *pBuf, uint16_t len)
         {
           BYTES_TO_UINT16(dataLen, &hdrRx[2]);
         }
-
+        HCI_TRACE_INFO1("hciTrSerialRxIncoming dataLen 0x%x", dataLen);
         /* allocate data buffer to hold entire packet */
         if ((pktIndRx == HCI_ACL_TYPE) && (dataLen <= HciGetMaxRxAclLen()))
         {
@@ -221,7 +224,7 @@ uint16_t hciTrSerialRxIncoming(uint8_t *pBuf, uint16_t len)
         if (pPktRx != NULL)
         {
           pDataRx = pPktRx;
-
+          HCI_TRACE_INFO0("hciTrSerialRxIncoming pPktRx != NULL");
           /* copy header into data packet (note: memcpy is not so portable) */
           {
             uint8_t  i;
@@ -230,9 +233,10 @@ uint16_t hciTrSerialRxIncoming(uint8_t *pBuf, uint16_t len)
               *pDataRx++ = hdrRx[i];
             }
           }
-
+          HCI_TRACE_INFO0("hciTrSerialRxIncoming pDataRx = pPktRx");
           /* save number of bytes left to read */
           iRx = dataLen;
+          HCI_TRACE_INFO1("hciTrSerialRxIncoming iRx = dataLen 0x%x", iRx);
           if (iRx == 0)
           {
             stateRx = HCI_RX_STATE_COMPLETE;
@@ -245,6 +249,7 @@ uint16_t hciTrSerialRxIncoming(uint8_t *pBuf, uint16_t len)
         else
         {
           /* allocate fails or gets invalid data length, discard this packet */
+          HCI_TRACE_INFO0("hciTrSerialRxIncoming allocate fails or gets invalid data length, discard this packet");
           stateRx = HCI_RX_STATE_IDLE;
           consumed_bytes = received_bytes;
           return consumed_bytes;
@@ -256,14 +261,17 @@ uint16_t hciTrSerialRxIncoming(uint8_t *pBuf, uint16_t len)
     /* --- Data State --- */
     else if (stateRx == HCI_RX_STATE_DATA)
     {
+      HCI_TRACE_INFO1("hciTrSerialRxIncoming dataByte 0x%x", dataByte);
       /* write incoming byte to allocated buffer */
       *pDataRx++ = dataByte;
 
       /* determine if entire packet has been read */
       iRx--;
+      HCI_TRACE_INFO1("hciTrSerialRxIncoming iRx 0x%x", iRx);
       if (iRx == 0)
       {
         stateRx = HCI_RX_STATE_COMPLETE;
+        HCI_TRACE_INFO0("hciTrSerialRxIncoming stateRx = HCI_RX_STATE_COMPLETE");
       }
       pBuf++;
       consumed_bytes++;
@@ -274,20 +282,24 @@ uint16_t hciTrSerialRxIncoming(uint8_t *pBuf, uint16_t len)
     /* ( Note Well!  There is no else-if construct by design. ) */
     if (stateRx == HCI_RX_STATE_COMPLETE)
     {
+      HCI_TRACE_INFO1("hciTrSerialRxIncoming stateRx = HCI_RX_STATE_COMPLETE, pPktRx 0x%x", pPktRx);
       g_bHCIReceivingPacket = FALSE;
 
       /* deliver data */
       if (pPktRx != NULL)
       {
         //am_hal_gpio_out_bit_set(13);
+        HCI_TRACE_INFO1("hciTrSerialRxIncoming hciCoreRecv pktIndRx 0x%x", pktIndRx);
         hciCoreRecv(pktIndRx, pPktRx);
+        HCI_TRACE_INFO0("hciTrSerialRxIncoming hciCoreRecv");
         //am_hal_gpio_out_bit_clear(13);
       }
-
+      HCI_TRACE_INFO0("hciTrSerialRxIncoming reset state machine");
       /* reset state machine */
       stateRx = HCI_RX_STATE_IDLE;
     }
   }
+  HCI_TRACE_INFO1("hciTrSerialRxIncoming consumed_bytes 0x%x", consumed_bytes);
   return consumed_bytes;
 }
 

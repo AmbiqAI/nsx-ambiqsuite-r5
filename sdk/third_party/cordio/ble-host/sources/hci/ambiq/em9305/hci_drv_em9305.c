@@ -40,7 +40,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -49,6 +49,7 @@
 
 #include "wsf_types.h"
 #include "wsf_timer.h"
+#include "wsf_trace.h"
 #include "bstream.h"
 #include "wsf_msg.h"
 #include "wsf_cs.h"
@@ -392,6 +393,16 @@ void
 HciDrvRadioShutdown(void)
 {
     BLE_HEARTBEAT_STOP();
+    
+    //
+    // decrement counter and check if we should proceed with turning off the radio
+    //
+    am_devices_em9305_request_counter_set(false);
+    if(am_devices_em9305_request_counter_get() != 0)
+    {
+        // do not power off EM9305
+        return;
+    }
 
     am_devices_em9305_disable_interrupt();
     am_devices_em9305_hsclk_req(false);//disable the EM9305 12M clock output
@@ -654,7 +665,7 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
     uint32_t ui32ErrorStatus, ui32TxRetries = 0;
     uint32_t ui32NumHciTransactions = 0;
     uint32_t read_hci_packet_count = 0;
-
+    HCI_TRACE_INFO0("HciDrvHandler");
     //
     // If this handler was called in response to a heartbeat event, then it's
     // time to run a benign HCI command. Normally, the BLE controller should
@@ -688,7 +699,7 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
     //
     if (g_ui32NumBytes > g_consumed_bytes)
     {
-        CRITICAL_PRINT("INFO: HCI data transferred to stack.\n");
+        HCI_TRACE_INFO0("INFO: HCI data transferred to stack.");
         //
         // If we have any bytes saved, we should send them to the BLE stack
         // now.
@@ -703,13 +714,13 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
         //
         if (g_consumed_bytes != g_ui32NumBytes)
         {
-            CRITICAL_PRINT("INFO: HCI data split up.\n");
+            HCI_TRACE_INFO0("INFO: HCI data split up.");
             WsfSetEvent(g_HciDrvHandleID, BLE_TRANSFER_NEEDED_EVENT);
             return;
         }
         else
         {
-            CRITICAL_PRINT("INFO: HCI RX packet complete.\n");
+            HCI_TRACE_INFO0("INFO: HCI RX packet complete.");
             g_ui32NumBytes   = 0;
             g_consumed_bytes = 0;
             bReadBufferInUse = false;
@@ -720,7 +731,7 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
     {
         if (bReadBufferInUse == true)
         {
-            CRITICAL_PRINT("Read buffer already in use.\n");
+            HCI_TRACE_INFO0("Read buffer already in use.");
             WsfSetEvent(g_HciDrvHandleID, BLE_TRANSFER_NEEDED_EVENT);
             return;
         }
@@ -729,7 +740,7 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
         // If the stack has used up all of the saved data we've accumulated so
         // far, we should check to see if we need to read any *new* data.
         //
-        CRITICAL_PRINT("INFO: HCI Read started.\n");
+        HCI_TRACE_INFO0("INFO: HCI Read started.");
         bReadBufferInUse = true;
         ui32ErrorStatus = am_hal_ble_nonblocking_hci_read(BLE,
                                                           g_pui32ReadBuffer,
@@ -740,9 +751,9 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
 
         if (g_ui32NumBytes > HCI_DRV_MAX_RX_PACKET)
         {
-            CRITICAL_PRINT("ERROR: Trying to receive an HCI packet "
+            HCI_TRACE_INFO1("ERROR: Trying to receive an HCI packet "
                            "larger than the hci driver buffer size "
-                           "(needs %d bytes of space).\n",
+                           "(needs %d bytes of space).",
                            g_ui32NumBytes);
 
             error_check(HCI_DRV_RX_PACKET_TOO_LARGE);
@@ -758,7 +769,7 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
             // so there shouldn't be any physical reason for the read to
             // fail.
             //
-            CRITICAL_PRINT("HCI READ failed with status %d. "
+            HCI_TRACE_INFO1("HCI READ failed with status %d. "
                            "Try recording with a logic analyzer "
                            "to catch the error.\n",
                            ui32ErrorStatus);
@@ -782,7 +793,7 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
     uint32_t ui32ErrorStatus, ui32TxRetries = 0;
     uint32_t ui32NumHciTransactions = 0;
     uint32_t read_hci_packet_count = 0;
-
+    HCI_TRACE_INFO0("HciDrvHandler");
     //
     // If this handler was called in response to a heartbeat event, then it's
     // time to run a benign HCI command. Normally, the BLE controller should
@@ -800,13 +811,14 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
             return;
         }
     }
-
+    HCI_TRACE_INFO0("HciDrvHandler 2 past null check");
     //
     // Check to see if we read any bytes over the HCI interface that we haven't
     // already sent to the BLE stack.
     //
     if (g_ui32NumBytes > g_consumed_bytes)
     {
+        HCI_TRACE_INFO0("HciDrvHandler 2 past g_ui32NumBytes > g_consumed_bytes check");
         //
         // If we have any bytes saved, we should send them to the BLE stack
         // now.
@@ -817,6 +829,7 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
         //
         // If the stack doesn't accept all of the bytes we had,
         //
+        HCI_TRACE_INFO2("HciDrvHandler 2 g_consumed_bytes, g_ui32NumBytes", g_consumed_bytes, g_ui32NumBytes);
         if (g_consumed_bytes != g_ui32NumBytes)
         {
             WsfSetEvent(g_HciDrvHandleID, BLE_TRANSFER_NEEDED_EVENT);
@@ -840,21 +853,22 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
         //
         if ( am_hal_gpio_input_read(GPIO_INT) )
         {
+            HCI_TRACE_INFO0("HciDrvHandler 2 am_hal_gpio_input_read(GPIO_INT)");
             uint32_t ui32OldInterruptsSeen = g_ui32InterruptsSeen;
 
             BLE_HEARTBEAT_RESTART();
-
+            HCI_TRACE_INFO0("HciDrvHandler 2 BLE_HEARTBEAT_RESTART");
             //
             // Is the BLE core asking for a read? If so, do that now.
             //
             g_ui32NumBytes = 0;
-
+            HCI_TRACE_INFO0("HciDrvHandler 2 g_ui32NumBytes = 0");
             ui32ErrorStatus = am_devices_em9305_block_read(g_IomDevHdl, (uint32_t*)g_pui32ReadBuffer, &g_ui32NumBytes);
-
+            HCI_TRACE_INFO1("HciDrvHandler 2 ui32ErrorStatus = am_devices_em9305_block_read %d", ui32ErrorStatus);
 
             if (g_ui32NumBytes > HCI_DRV_MAX_RX_PACKET)
             {
-                CRITICAL_PRINT("ERROR: Trying to receive an HCI packet larger than the hci driver buffer size (needs %d bytes of space).",
+                HCI_TRACE_INFO1("ERROR: Trying to receive an HCI packet larger than the hci driver buffer size (needs %d bytes of space).",
                                g_ui32NumBytes);
 
                 error_check(HCI_DRV_RX_PACKET_TOO_LARGE);
@@ -877,17 +891,17 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
 
                     am_util_delay_us(1);
                 }
-
+                HCI_TRACE_INFO1("HciDrvHandler 2 ui32IRQRetries = %d", ui32IRQRetries);
                 //
                 // Pass the data along to the stack. The stack should be able
                 // to read as much data as we send it.  If it can't, we need to
                 // know that.
                 //
                 g_consumed_bytes = hciTrSerialRxIncoming(g_pui8ReadBuffer, g_ui32NumBytes);
-
+                HCI_TRACE_INFO1("HciDrvHandler 2 g_consumed_bytes = %d", g_consumed_bytes);
                 if (g_consumed_bytes != g_ui32NumBytes)
                 {
-
+                    HCI_TRACE_INFO2("HciDrvHandler 2 second g_consumed_bytes, g_ui32NumBytes", g_consumed_bytes, g_ui32NumBytes);
                     // need to come back again
                     WsfSetEvent(g_HciDrvHandleID, BLE_TRANSFER_NEEDED_EVENT);
                     // take a break now
@@ -903,6 +917,7 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
             }
             else
             {
+                HCI_TRACE_INFO1("HciDrvHandler 2 HCI READ failed with status %d. Try recording with a logic analyzer to catch the error.", ui32ErrorStatus);
                 //
                 // If the read didn't succeed for some physical reason, we need
                 // to know. We shouldn't get failures here. We checked the IRQ
@@ -929,6 +944,7 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
         }
         else
         {
+            HCI_TRACE_INFO0("HciDrvHandler 2 am_hal_queue_empty(&g_sWriteQueue)");
             //
             // If we don't have anything to read, we can start checking to see
             // if we have things to write.
@@ -990,7 +1006,7 @@ HciDrvHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
 
     if (ui32NumHciTransactions == HCI_DRV_MAX_HCI_TRANSACTIONS)
     {
-        CRITICAL_PRINT("ERROR: Maximum number of successive HCI transactions exceeded.\n");
+        HCI_TRACE_INFO0("HciDrvHandler 2 ERROR: Maximum number of successive HCI transactions exceeded.");
         ERROR_RECOVER(HCI_DRV_TOO_MANY_PACKETS);
     }
 }

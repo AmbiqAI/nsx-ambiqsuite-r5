@@ -41,7 +41,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 //! @cond SYSCTRL_CLK_MUX_RESET
@@ -85,7 +85,8 @@ typedef enum
 
     // SYSCTRL_CLKMUXRST_CLK_MAX Should always be the last entry
     SYSCTRL_CLKMUXRST_CLK_MAX,
-} am_hal_sysctrl_clkmuxrst_clk_e;
+}
+am_hal_sysctrl_clkmuxrst_clk_e;
 
 //*****************************************************************************
 //
@@ -120,7 +121,7 @@ extern void am_hal_sysctrl_clkmuxrst_clkneeded_update(am_hal_sysctrl_clkmuxrst_c
 //! @brief Handle clock muxes reset during low_power_init
 //
 //*****************************************************************************
-extern void am_hal_sysctrl_clkmuxrst_low_power_init();
+extern void am_hal_sysctrl_clkmuxrst_low_power_init(void);
 
 #ifdef __cplusplus
 }

@@ -1783,3 +1783,61 @@ void HciLeSetHostFeatureCmd(uint8_t bitNum, bool_t bitVal)
   }
 }
 
+#if (BT_53)
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE Set Default Subrate command.
+ *
+ *  \param      pSubrateParam      Default subrate parameters.
+ *
+ *  \return     None.
+ */
+/*************************************************************************************************/
+void HciLeSetDefaultSubrateCmd(hciLeSetDefaultSubrate_t *pSubrateParam)
+{
+  uint8_t *pBuf;
+  uint8_t *p;
+
+  if ((pBuf = hciCmdAlloc(HCI_OPCODE_LE_SET_DEFAULT_SUBRATE, HCI_LEN_LE_SET_DEFAULT_SUBRATE)) != NULL)
+  {
+      p = pBuf + HCI_CMD_HDR_LEN;
+      UINT16_TO_BSTREAM(p, pSubrateParam->subrateMin);
+      UINT16_TO_BSTREAM(p, pSubrateParam->subrateMax);
+      UINT16_TO_BSTREAM(p, pSubrateParam->maxLatency);
+      UINT16_TO_BSTREAM(p, pSubrateParam->contNum);
+      UINT16_TO_BSTREAM(p, pSubrateParam->supTimeout);
+
+      hciCmdSend(pBuf);
+  }
+}
+
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE Subrate request command.
+ *
+ *  \param      handle            Connection handle.
+ *  \param      pSubrateParam     Request subrate parameters.
+ *
+ *  \return     None.
+ */
+/*************************************************************************************************/
+void HciLeSubrateReqCmd(uint16_t handle, hciLeSubrateReq_t *pSubrateParam)
+{
+  uint8_t *pBuf;
+  uint8_t *p;
+
+  if ((pBuf = hciCmdAlloc(HCI_OPCODE_LE_SUBRATE_REQ, HCI_LEN_LE_SUBRATE_REQ)) != NULL)
+  {
+      p = pBuf + HCI_CMD_HDR_LEN;
+      UINT16_TO_BSTREAM(p, handle);
+      UINT16_TO_BSTREAM(p, pSubrateParam->subrateMin);
+      UINT16_TO_BSTREAM(p, pSubrateParam->subrateMax);
+      UINT16_TO_BSTREAM(p, pSubrateParam->maxLatency);
+      UINT16_TO_BSTREAM(p, pSubrateParam->contNum);
+      UINT16_TO_BSTREAM(p, pSubrateParam->supTimeout);
+
+      hciCmdSend(pBuf);
+  }
+}
+
+#endif // BT_53

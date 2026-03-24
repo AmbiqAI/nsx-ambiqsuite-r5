@@ -56,12 +56,13 @@ void *WsfMsgDataAlloc(uint16_t len, uint8_t tailroom)
  *  \return Pointer to message buffer or NULL if allocation failed.
  */
 /*************************************************************************************************/
+#include "ns_ambiqsuite_harness.h"
 void *WsfMsgAlloc(uint16_t len)
 {
   wsfMsg_t  *pMsg;
-
+  // ns_lp_printf("WsfMsgAlloc len: %d\n", len);
   pMsg = WsfBufAlloc(len + sizeof(wsfMsg_t));
-
+  // ns_lp_printf("WsfMsgAlloc pMsg: 0x%x\n", pMsg);
   /* hide header */
   if (pMsg != NULL)
   {

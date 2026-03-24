@@ -2,11 +2,46 @@
 //
 //! @file am_devices_em9305.c
 //!
-//! @brief Support functions for the EM Micro EM9305 BTLE radio.
+//! @brief Support functions for the EM Micro EM9305 BTLE radio
 //!
-//! @addtogroup em9305 EM9305 BTLE Radio Device Driver
+//! @addtogroup devices_em9305 EM9305 BTLE Radio Device Driver
 //! @ingroup devices
 //! @{
+//!
+//! Purpose: This module provides a hardware abstraction layer for the EM9305
+//!          Bluetooth Low Energy (BTLE) radio device. It supports SPI communication,
+//!          radio initialization, firmware updates, power management, and event handling.
+//!          The driver enables reliable wireless connectivity, command and data transfer,
+//!          and integration with embedded applications requiring Bluetooth functionality.
+//!          It includes support for blocking and non-blocking operations, pin
+//!          configuration, and robust error handling for optimal system integration.
+//!
+//! @section devices_em9305_features Key Features
+//!
+//! 1. @b SPI @b Communication: Fast and reliable data transfer.
+//! 2. @b Firmware @b Update: Supports firmware programming and verification.
+//! 3. @b Power @b Management: Efficient sleep and wake control.
+//! 4. @b Event @b Handling: Interrupt-driven event processing.
+//! 5. @b Error @b Handling: Robust error detection and reporting.
+//!
+//! @section devices_em9305_functionality Functionality
+//!
+//! - Initialize and deinitialize EM9305 device
+//! - Perform blocking and non-blocking read/write operations
+//! - Manage power, sleep, and wake states
+//! - Handle firmware updates and versioning
+//! - Configure pins and interrupts
+//!
+//! @section devices_em9305_usage Usage
+//!
+//! 1. Initialize device with am_devices_em9305_init()
+//! 2. Read/write data using block APIs
+//! 3. Update firmware and manage power states
+//!
+//! @section devices_em9305_configuration Configuration
+//!
+//! - Configure SPI clock frequency and buffer sizes
+//! - Set up device handle and pin configuration
 //
 //*****************************************************************************
 
@@ -44,7 +79,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -82,10 +117,10 @@
 #define EM9305_BUFFER_SIZE                      259     // Including 255 maximum HCI command + 4 HCI header
 
 //! Select the EM9305 -> Set the CSN to low level
-#define EM9305_SPISLAVESELECT()                 am_hal_gpio_state_write(AM_BSP_GPIO_EM9305_CS, AM_HAL_GPIO_OUTPUT_CLEAR);
+#define EM9305_SPI_DEVICE_SELECT()                 am_hal_gpio_state_write(AM_BSP_GPIO_EM9305_CS, AM_HAL_GPIO_OUTPUT_CLEAR);
 
 //! Deselect the EM9305 -> Set the CSN to high level
-#define EM9305_SPISLAVEDESELECT()               am_hal_gpio_state_write(AM_BSP_GPIO_EM9305_CS, AM_HAL_GPIO_OUTPUT_SET);
+#define EM9305_SPI_DEVICE_DESELECT()               am_hal_gpio_state_write(AM_BSP_GPIO_EM9305_CS, AM_HAL_GPIO_OUTPUT_SET);
 
 //! Indicates the EM9305 RDY pin state
 #define EM9305_RDY_INT()                        (am_hal_gpio_input_read(AM_BSP_GPIO_EM9305_INT))
@@ -153,6 +188,13 @@ uint32_t g_sEM9305_swap_spi_total_image_len = 0;
 NvmPage *g_erasePages_swap_spi;
 uint32_t g_erasePage_num_swap_spi = 0;
 
+// Global pointers to device handle for EM9305
+void** g_ppHandle;
+void** g_ppIomHandle;
+
+bool g_bIsSleep = false;
+static volatile uint32_t g_ui32SipCounter;
+
 //*****************************************************************************
 //
 //! @brief Configure EM9305 pins.
@@ -174,13 +216,6 @@ am_devices_em9305_config_pins(void)
     am_hal_gpio_pinconfig(AM_BSP_GPIO_EM9305_CM, am_hal_gpio_pincfg_input);
     am_hal_gpio_pinconfig(AM_BSP_GPIO_AP5_12M_CLKREQ, am_hal_gpio_pincfg_output);
     am_hal_gpio_pinconfig(AM_BSP_GPIO_EM9305_32K_CLK, g_AM_BSP_GPIO_EM9305_32K_CLK);
-
-#if defined(AM_BSP_EM9305_INT_PULLDOWN)
-    // pull down the AM_BSP_GPIO_EM9305_INT before enabling the EM9305
-    am_hal_gpio_pincfg_t pull_down_config = am_hal_gpio_pincfg_input;
-    pull_down_config.GP.cfg_b.ePullup = AM_HAL_GPIO_PIN_PULLDOWN_50K;
-    am_hal_gpio_pinconfig(AM_BSP_GPIO_EM9305_INT, pull_down_config);
-#endif
 
     am_hal_gpio_state_write(AM_BSP_GPIO_EM9305_CS, AM_HAL_GPIO_OUTPUT_SET);
     am_hal_gpio_state_write(AM_BSP_GPIO_EM9305_EN, AM_HAL_GPIO_OUTPUT_CLEAR);
@@ -329,6 +364,28 @@ void am_devices_em9305_disable(void)
     am_hal_gpio_pinconfig(AM_BSP_GPIO_EM9305_32K_CLK, am_hal_gpio_pincfg_disabled);
 }
 
+/* Configure the EM9305 SPI RDY pin pull-down functionality.
+ *
+ * This function configures the pin to use an internal
+ * pull-down resistor if needed, which is useful for proper signal
+ * handling in systems where the pin may float.
+ *
+ * @param pull_down If true, enables the 50K ohm internal pull-down resistor.
+ *                  If false, uses the default input configuration without
+ *                  an explicit pull-down
+ */
+static void config_EM9305_SPI_RDY_PullDown(bool pull_down)
+{
+    am_hal_gpio_pincfg_t pull_down_config = am_hal_gpio_pincfg_input;
+
+    if ( pull_down )
+    {
+        pull_down_config.GP.cfg_b.ePullup = AM_HAL_GPIO_PIN_PULLDOWN_50K;
+    }
+
+    am_hal_gpio_pinconfig(AM_BSP_GPIO_EM9305_INT, pull_down_config);
+}
+
 //*****************************************************************************
 //
 //! @brief EM9305 SPI/IOM initialization function.
@@ -348,7 +405,35 @@ am_devices_em9305_init(uint32_t ui32Module, am_devices_em9305_config_t *pDevConf
     am_hal_iom_config_t     stIOMEM9305Settings;
     uint32_t      ui32Index = 0;
 
+    //
+    // Check if device is already initialized
+    //
+    if ( am_devices_em9305_request_counter_get() != 0 )
+    {
+        //
+        // If EM9305 is already initialized, then redirect the device handle and IOM handle
+        // return success since no need to reinitialize the device again
+        //
+        *ppHandle = *g_ppHandle;
+        *ppIomHandle = *g_ppIomHandle;
+
+        uint32_t image_version = 0;
+        uint32_t ui32Status = am_devices_em9305_get_fw_verion(*ppHandle, &image_version);
+
+        if ( (ui32Status == AM_DEVICES_EM9305_STATUS_SUCCESS)
+             && (image_version!=EM9305_FW_VER_INVALID) )
+        {
+            am_util_stdio_printf("BLE FW Ver: %d.%d.%d.%d\r\n", (image_version & 0xFF000000) >> 24, (image_version & 0xFF0000) >> 16,
+                                        (image_version & 0xFF00) >> 8, image_version & 0xFF);
+        }
+
+        am_devices_em9305_request_counter_set(true);  // increment resource counter
+        return AM_DEVICES_EM9305_STATUS_SUCCESS;
+    }
+
+    //
     // Allocate a vacant device handle
+    //
     for ( ui32Index = 0; ui32Index < AM_DEVICES_EM9305_MAX_DEVICE_NUM; ui32Index++ )
     {
         if ( gAmEm9305[ui32Index].bOccupied == false )
@@ -398,9 +483,23 @@ am_devices_em9305_init(uint32_t ui32Module, am_devices_em9305_config_t *pDevConf
     *ppHandle = (void *)&gAmEm9305[ui32Index];
     am_devices_em9305_bus_disable(*ppHandle);
 
+    //
     // Reset EM9305 after device initialization.
+    //
     uint32_t ui32Status = am_devices_em9305_reset(*ppHandle);
     am_util_debug_printf("EM9305 reset status =%d \r\n", ui32Status);
+
+#if (AM_DEVICES_EM9305_HF_CRYSTAL_CUSTOM_TRIMS)
+    if ( ui32Status == AM_DEVICES_EM9305_STATUS_SUCCESS )
+    {
+        am_devices_em9305_crystal_trim_set(*ppHandle, EM9305_HF_CRYSTAL_TRIM_VALUE_DEFAULT, false);
+    }
+    else
+    {
+        // Force update the trim value when reset failure occurs, this may be caused by incorrect writing of content in the trim value field.
+        am_devices_em9305_crystal_trim_set(*ppHandle, EM9305_HF_CRYSTAL_TRIM_VALUE_DEFAULT, true);
+    }
+#endif
 
     uint32_t image_version = 0;
     ui32Status = am_devices_em9305_get_fw_verion(*ppHandle, &image_version);
@@ -411,8 +510,19 @@ am_devices_em9305_init(uint32_t ui32Module, am_devices_em9305_config_t *pDevConf
         am_util_stdio_printf("BLE FW Ver: %d.%d.%d.%d\r\n", (image_version & 0xFF000000) >> 24, (image_version & 0xFF0000) >> 16,
                                     (image_version & 0xFF00) >> 8, image_version & 0xFF);
     }
+
+    //
     // Default not using 1.9v voltage during programming.
+    //
     am_devices_em9305_set_pump_to_1p9v(false);
+
+    //
+    // Assign global handle pointers and increment resource counter
+    //
+    g_ppHandle = ppHandle;
+    g_ppIomHandle = ppIomHandle;
+    am_devices_em9305_request_counter_set(true);
+
     //
     // Return the status.
     //
@@ -433,8 +543,12 @@ am_devices_em9305_term(void* pHandle)
     {
         return AM_DEVICES_EM9305_STATUS_ERROR;
     }
+
+    //
     // Disable the pins
+    //
     am_bsp_iom_pins_disable(pIom->ui32Module, AM_HAL_IOM_SPI_MODE);
+
     //
     // Disable the IOM.
     //
@@ -450,9 +564,12 @@ am_devices_em9305_term(void* pHandle)
     pIom->bBusy = false;
     am_hal_iom_uninitialize(pIom->pIomHandle);
 
+    //
     // Free this device handle
+    //
     pIom->bOccupied = false;
 
+    //
     // Return the status.
     //
     return AM_DEVICES_EM9305_STATUS_SUCCESS;
@@ -477,7 +594,9 @@ am_devices_em9305_tx_starts(void *pHandle)
     am_hal_iom_transfer_t Transaction;
     am_devices_em9305_t *pIom = (am_devices_em9305_t *)pHandle;
 
+    //
     // Indicates that a SPI transfer is in progress
+    //
     spiTxInProgress = 1;
 
     am_hal_iom_buffer(2) sCommand;
@@ -485,10 +604,14 @@ am_devices_em9305_tx_starts(void *pHandle)
     sCommand.bytes[0] = EM9305_SPI_HEADER_TX ;
     sCommand.bytes[1] = 0x00;
 
+    //
     // Select the EM9305
-    EM9305_SPISLAVESELECT();
+    //
+    EM9305_SPI_DEVICE_SELECT();
 
+    //
     // Wait EM9305 RDY signal or timeout
+    //
     for (uint32_t i = 0; i < AM_DEVICES_EM9305_TIMEOUT; i++)
     {
         if (EM9305_RDY_INT())
@@ -508,19 +631,21 @@ am_devices_em9305_tx_starts(void *pHandle)
         //
         // Select the EM9305
         //
-        EM9305_SPISLAVESELECT();
+        EM9305_SPI_DEVICE_SELECT();
 #if defined(AM_PART_APOLLO4B)
         am_util_delay_us(200);
 #endif
 
     if ( am_devices_em9305_spi_bitbang_enabled() )
     {
+        //
         // Read the data on MISO line at once after writing the data out,
         // and it can only read the second byte, the 0xC0 will be missed.
+        //
         SPI_write_byte(sCommand.bytes[0]);
 
         sStas.bytes[1] = SPI_read_byte();
-        if ( sStas.bytes[1] != 0x00 )
+        if (sStas.bytes[1] != 0x00)
         {
             break;
         }
@@ -557,7 +682,7 @@ am_devices_em9305_tx_starts(void *pHandle)
         }
         else
         {
-            EM9305_SPISLAVEDESELECT();
+            EM9305_SPI_DEVICE_DESELECT();
         }
     }
 
@@ -585,10 +710,19 @@ am_devices_em9305_tx_starts(void *pHandle)
 void
 am_devices_em9305_tx_ends(void *pHandle)
 {
+    //
+    // Delay 50us before pulling high CS PIN, this is to fix the HCI command
+    // timeout issue during reset stress testing.
+    //
+    am_util_delay_us(50);
+    //
     // Deselect the EM9305
-    EM9305_SPISLAVEDESELECT();
+    //
+    EM9305_SPI_DEVICE_DESELECT();
 
+    //
     // Indicates that the SPI transfer is finished
+    //
     spiTxInProgress = 0;
 }
 
@@ -606,8 +740,10 @@ am_devices_em9305_bus_enable(void* pHandle)
         return AM_DEVICES_EM9305_STATUS_INVALID_OPERATION;
     }
 
+    //
     // Mark the BLE interface busy so it doesn't get used by more than one
     // interface.
+    //
     if (pBle->bBusy == false)
     {
         pBle->bBusy = true;
@@ -649,7 +785,10 @@ am_devices_em9305_bus_disable(void* pHandle)
     // Disable power.
     //
     am_hal_iom_power_ctrl(pBle->pIomHandle, AM_HAL_SYSCTRL_DEEPSLEEP, true);
+
+    //
     // Release the bus so someone else can use it.
+    //
     pBle->bBusy = false;
 
     return AM_DEVICES_EM9305_STATUS_SUCCESS;
@@ -659,14 +798,13 @@ am_devices_em9305_bus_disable(void* pHandle)
 //
 //! @brief EM9305 write function.
 //!
-//! @param psDevice is a pointer to a device structure describing the EM9305.
-//! @param type is the HCI command.
-//! @param pui8Values is the HCI packet to send.
-//! @param ui32NumBytes is the number of bytes to send (including HCI command).
+//! @param pHandle Pointer to the EM9305 device handle.
+//! @param pui8Values Pointer to the HCI packet to send.
+//! @param ui32NumBytes Number of bytes to send (including HCI command).
 //!
 //! This function perform a write transaction to the EM9305.
 //!
-//! @return None.
+//! @return Status code. AM_DEVICES_EM9305_STATUS_SUCCESS if successful, error code otherwise.
 //
 //*****************************************************************************
 uint32_t am_devices_em9305_block_write(void *pHandle,
@@ -680,7 +818,9 @@ uint32_t am_devices_em9305_block_write(void *pHandle,
     am_hal_iom_transfer_t       Transaction;
     am_devices_em9305_t *pIom = (am_devices_em9305_t *)pHandle;
 
+    //
     // Awake IOM and lock the bus
+    //
     ui32ErrorStatus = am_devices_em9305_bus_enable(pHandle);
     if (ui32ErrorStatus != AM_DEVICES_EM9305_STATUS_SUCCESS)
     {
@@ -749,7 +889,9 @@ uint32_t am_devices_em9305_block_write(void *pHandle,
         am_util_debug_printf("HCI TX Error (STATUS ERROR) Packet Too Large\n");
     }
 
+    //
     // Disable IOM to save power
+    //
     am_devices_em9305_bus_disable(pHandle);
 
     return ui32ErrorStatus;
@@ -759,13 +901,13 @@ uint32_t am_devices_em9305_block_write(void *pHandle,
 //
 //! @brief EM9305 read function.
 //!
-//! @param psDevice is a pointer to a device structure describing the EM9305.
-//! @param pui8Values is the buffer to receive the HCI packet.
-//! @param ui32NumBytes is the number of bytes to send (including HCI command).
+//! @param pHandle Pointer to the EM9305 device handle.
+//! @param pui32Values Pointer to the buffer to receive the HCI packet.
+//! @param ui32NumBytes Pointer to the variable holding the number of bytes read.
 //!
-//! This function a read transaction from the EM9305.
+//! This function performs a read transaction from the EM9305.
 //!
-//! @return Number of bytes read.
+//! @return Status code. AM_DEVICES_EM9305_STATUS_SUCCESS if successful, error code otherwise.
 //
 //*****************************************************************************
 uint32_t
@@ -800,8 +942,10 @@ am_devices_em9305_block_read(void *pHandle,
     //
     if (!EM9305_RDY_INT())
     {
+        //
         // No data
-       // am_util_debug_printf("BLE SPI No data\n");
+        //
+        // am_util_debug_printf("BLE SPI No data\n");
         return AM_DEVICES_EM9305_NO_DATA_TX;
     }
 
@@ -816,7 +960,7 @@ am_devices_em9305_block_read(void *pHandle,
     {
         if ( am_devices_em9305_spi_bitbang_enabled() )
         {
-            EM9305_SPISLAVESELECT();
+            EM9305_SPI_DEVICE_SELECT();
 
             SPI_write_byte(0x81);
 
@@ -824,7 +968,7 @@ am_devices_em9305_block_read(void *pHandle,
 
             if ( ( sStas.bytes[1] == 0x00) || (sStas.bytes[1] == 0xff) )
             {
-                EM9305_SPISLAVEDESELECT();
+                EM9305_SPI_DEVICE_DESELECT();
                 am_util_debug_printf("EM9305 Not Ready sStas.byte0 = 0x%02x, sStas.byte1 = 0x%02x\n", sStas.bytes[0], sStas.bytes[1]);
                 ui32ErrorStatus = AM_DEVICES_EM9305_NOT_READY;
                 break;
@@ -842,7 +986,7 @@ am_devices_em9305_block_read(void *pHandle,
                     //
                     // Error. Packet too large.
                     //
-                    EM9305_SPISLAVEDESELECT();
+                    EM9305_SPI_DEVICE_DESELECT();
                     am_util_debug_printf("HCI RX Error (STATUS ERROR) Packet Too Large %d, %d\n", sStas.bytes[0], sStas.bytes[1]);
                     ui32ErrorStatus = AM_DEVICES_EM9305_DATA_LENGTH_ERROR;
                     break;
@@ -866,7 +1010,7 @@ am_devices_em9305_block_read(void *pHandle,
                 //
                 // Select the EM9305
                 //
-                EM9305_SPISLAVESELECT();
+                EM9305_SPI_DEVICE_SELECT();
 
                 memset(&Transaction, 0, sizeof(am_hal_iom_transfer_t));
                 Transaction.ui8RepeatCount  = 0;
@@ -886,7 +1030,7 @@ am_devices_em9305_block_read(void *pHandle,
                 //am_util_debug_printf("am_hal_iom_spi_blocking_fullduplex read ret = %d, byte 0:0x%xbyte 1:0x%x\n",ui32ErrorStatus, sStas.bytes[0],sStas.bytes[1]);
                 if (AM_HAL_STATUS_SUCCESS != ret)
                 {
-                    EM9305_SPISLAVEDESELECT();
+                    EM9305_SPI_DEVICE_DESELECT();
                     //am_util_stdio_printf("am_hal_iom_spi_blocking_fullduplex read ui32ErrorStatus =%d\n",ui32ErrorStatus);
                     ui32ErrorStatus = AM_DEVICES_EM9305_CMD_TRANSFER_ERROR;
                     break;
@@ -901,7 +1045,7 @@ am_devices_em9305_block_read(void *pHandle,
                 }
                 else
                 {
-                    EM9305_SPISLAVEDESELECT();
+                    EM9305_SPI_DEVICE_DESELECT();
                 }
             }
 
@@ -910,7 +1054,7 @@ am_devices_em9305_block_read(void *pHandle,
             //
             if (( sStas.bytes[0] != EM9305_STS1_READY_VALUE ) || ( sStas.bytes[1] == 0x00))
             {
-                EM9305_SPISLAVEDESELECT();
+                EM9305_SPI_DEVICE_DESELECT();
                 am_util_debug_printf("EM9305 Not Ready sStas.byte0 = 0x%02x, sStas.byte1 = 0x%02x\n", sStas.bytes[0], sStas.bytes[1]);
                 ui32ErrorStatus = AM_DEVICES_EM9305_NOT_READY;
                 break;
@@ -928,7 +1072,7 @@ am_devices_em9305_block_read(void *pHandle,
                     //
                     // Error. Packet too large.
                     //
-                    EM9305_SPISLAVEDESELECT();
+                    EM9305_SPI_DEVICE_DESELECT();
                     am_util_debug_printf("HCI RX Error (STATUS ERROR) Packet Too Large %d, %d\n", sStas.bytes[0], sStas.bytes[1]);
                     ui32ErrorStatus = AM_DEVICES_EM9305_DATA_LENGTH_ERROR;
                     break;
@@ -953,7 +1097,7 @@ am_devices_em9305_block_read(void *pHandle,
 
                 if (AM_HAL_STATUS_SUCCESS != ret)
                 {
-                    EM9305_SPISLAVEDESELECT();
+                    EM9305_SPI_DEVICE_DESELECT();
                     am_util_stdio_printf(" am_hal_iom_blocking_transfer AM_HAL_IOM_RX ret =%d\n", ret);
                     ui32ErrorStatus = AM_DEVICES_EM9305_DATA_TRANSFER_ERROR;
                     break;
@@ -965,11 +1109,13 @@ am_devices_em9305_block_read(void *pHandle,
             }
         }
         // Deselect the EM9305
-        EM9305_SPISLAVEDESELECT();
+        EM9305_SPI_DEVICE_DESELECT();
 
     } while(EM9305_RDY_INT());
 
+    //
     // Disable IOM to save power
+    //
     am_devices_em9305_bus_disable(pHandle);
 
     return ui32ErrorStatus;
@@ -1005,7 +1151,10 @@ uint32_t am_devices_em9305_reset(void *pHandle)
 
     do
     {
+        //
         // Assert RESET to the EM9305 device.
+        //
+        config_EM9305_SPI_RDY_PullDown(true);
         am_hal_gpio_state_write(AM_BSP_GPIO_EM9305_EN, AM_HAL_GPIO_OUTPUT_CLEAR);
 
         am_util_delay_ms(1);
@@ -1013,11 +1162,15 @@ uint32_t am_devices_em9305_reset(void *pHandle)
         am_hal_gpio_state_write(AM_BSP_GPIO_EM9305_EN, AM_HAL_GPIO_OUTPUT_SET);
 
 #if defined(AM_BSP_EM9305_READY_DELAY)
+        //
         // Wait for the EM9305 ready and run the code.
+        //
         am_util_delay_ms(2);
 #endif
+        //
         // After the reset, the SPI_RDY signal will be pulled high first, which is the behavior of the hardware.
         // Therefore, we wait for the end of the reset process here.
+        //
         WHILE_TIMEOUT_MS((am_hal_gpio_input_read(AM_BSP_GPIO_EM9305_INT) == 1), 30, ui32ErrorStatus);
         if (ui32ErrorStatus)
         {
@@ -1025,8 +1178,11 @@ uint32_t am_devices_em9305_reset(void *pHandle)
             break;
         }
 
+        //
         // Wait reset complete event from EM9305
+        //
         WHILE_TIMEOUT_MS((am_hal_gpio_input_read(AM_BSP_GPIO_EM9305_INT) == 0), 30, ui32ErrorStatus);
+        config_EM9305_SPI_RDY_PullDown(false);
         if (ui32ErrorStatus)
         {
             ui32ErrorStatus = AM_DEVICES_EM9305_RESET_FAIL;
@@ -1143,7 +1299,9 @@ uint32_t am_devices_em9305_command_write(void* pHandle, uint32_t* pui32Cmd, uint
             break;
         }
 
+        //
         // Wait for the response, and return it to the caller via our variable.
+        //
         WHILE_TIMEOUT_MS ( am_hal_gpio_input_read(AM_BSP_GPIO_EM9305_INT) == 0, 5000, ui32ErrorStatus );
         if (ui32ErrorStatus)
         {
@@ -1154,7 +1312,9 @@ uint32_t am_devices_em9305_command_write(void* pHandle, uint32_t* pui32Cmd, uint
         while(1)
         {
             ui32ErrorStatus = am_devices_em9305_block_read(pHandle, pui32Response, pui32BytesReceived);
+            //
             // Keep reading until we get the corresponding response
+            //
             if ((ui32ErrorStatus) || ((UINT32_TO_BYTE0(pui32Response[1]) == UINT32_TO_BYTE1(pui32Cmd[0])) && (UINT32_TO_BYTE1(pui32Response[1]) == UINT32_TO_BYTE2(pui32Cmd[0]))))
             {
                 break;
@@ -1249,12 +1409,16 @@ static bool check_programed(void *pHandle)
 
         if ( ui32ErrorStatus == AM_DEVICES_EM9305_STATUS_SUCCESS )
         {
+            //
             // Get expected CRC32 values
+            //
             ui32ErrorStatus = am_hal_crc32((uint32_t)data, (uint32_t)data_len, &expected_crc);
 
             if ( ui32ErrorStatus == AM_HAL_STATUS_SUCCESS )
             {
+                //
                 // Compare actual and expected CRC32 values
+                //
                 if (actual_crc != expected_crc)
                 {
                     am_util_stdio_printf("crc mismatch, actual_crc:0x%x,  expected_crc:0x%x\r\n", actual_crc, expected_crc);
@@ -1279,12 +1443,18 @@ static bool check_programed(void *pHandle)
 // 30KHz square wave period in microseconds
 #define SQUARE_WAVE_PERIOD_US 33   // 1 / 30000 * 1000000
 
+//*****************************************************************************
+//
 // Function to generate a 30KHz square wave for a specified duration
+//
+//*****************************************************************************
 void generate_square_wave(uint32_t duration_ms)
 {
     uint32_t i;
 
+    //
     // Configure GPIO15 as output and default low
+    //
     am_hal_gpio_pinconfig(AM_BSP_GPIO_EM9305_CM, am_hal_gpio_pincfg_output);
     am_hal_gpio_state_write(AM_BSP_GPIO_EM9305_CM, AM_HAL_GPIO_OUTPUT_CLEAR);
 
@@ -1300,7 +1470,11 @@ void generate_square_wave(uint32_t duration_ms)
     }
 }
 
+//*****************************************************************************
+//
 // Pulse GPIO EN to reset EM9305
+//
+//*****************************************************************************
 static void em9305_pulse_gpio_en(void)
 {
     am_hal_gpio_state_write(AM_BSP_GPIO_EM9305_EN, AM_HAL_GPIO_OUTPUT_CLEAR);
@@ -1331,10 +1505,14 @@ uint32_t enter_cm_mode(void *pHandle)
 
     do
     {
+        //
         // Output a 30KHz square wave on GPIO15 for 40ms
+        //
         generate_square_wave(40);
 
+        //
         // Check if SPI data is ready
+        //
         if ( am_hal_gpio_input_read(AM_BSP_GPIO_EM9305_INT) == 0 )
         {
             continue;
@@ -1344,7 +1522,9 @@ uint32_t enter_cm_mode(void *pHandle)
             ui32ErrorStatus = am_devices_em9305_block_read(pHandle, pui32Response.words, &pui32BytesReceived);
             if ( ui32ErrorStatus == AM_DEVICES_EM9305_STATUS_SUCCESS )
             {
+                //
                 // Check if it's the enter configure mode event
+                //
                 if ( memcmp(pui32Response.bytes, entered_cm_evt, sizeof(entered_cm_evt)) == 0 )
                 {
                     am_util_stdio_printf("Entered Configuration Mode\r\n");
@@ -1587,22 +1767,30 @@ static uint32_t check_data(void *pHandle)
         uint32_t data_len     = fw_image[i]->length;
         uint8_t *data         = (uint8_t *)(fw_image[i]->data);
 
+        //
         // Send CRC32 calculation request
+        //
         ui32ErrorStatus = crc32_calculation_request(pHandle, addr, addr + data_len, &actual_crc);
 
+        //
         // Check if CRC32 calculation was successful
+        //
         if (ui32ErrorStatus != AM_DEVICES_EM9305_STATUS_SUCCESS)
         {
             am_util_stdio_printf("Failed to calculate CRC32\n");
             break;
         }
 
+        //
         // Get expected CRC32 values
+        //
         ui32ErrorStatus = am_hal_crc32((uint32_t)data, data_len, &expected_crc);
 
         if ( ui32ErrorStatus == AM_HAL_STATUS_SUCCESS )
         {
+            //
             // Compare actual and expected CRC32 values
+            //
             if (actual_crc != expected_crc)
             {
                 ui32ErrorStatus = AM_DEVICES_EM9305_CKECKSUM_ERROR;
@@ -1620,8 +1808,12 @@ static uint32_t check_data(void *pHandle)
     return ui32ErrorStatus;
 }
 
-// Modifying the settings of the DC-DC logic to maximize the voltage multiplier drive voltage
-// and strength and set NVM programming voltage to maximum.
+//*****************************************************************************
+//
+// Modifying the settings of the DC-DC logic to maximize the voltage multiplier
+// drive voltage and strength and set NVM programming voltage to maximum.
+//
+//*****************************************************************************
 static uint32_t pump_to_1p9v(void *pHandle)
 {
     uint32_t ui32ErrorStatus = AM_DEVICES_EM9305_STATUS_SUCCESS;
@@ -1631,8 +1823,10 @@ static uint32_t pump_to_1p9v(void *pHandle)
 
     if ( ui32ErrorStatus == AM_DEVICES_EM9305_STATUS_SUCCESS )
     {
+        //
         // Clearing address 0xF0040C, bits 12:8 sets the regulation target voltage to 1.9V.
         // This is setting a comparator monitoring the NVM write voltage to control regulation to 1.9V (available options are 1.7V or 1.9V).
+        //
         register_value &= 0xFFFFE0FF;
 
         ui32ErrorStatus = write_data_cmd(pHandle, 0xF0040C, (uint8_t *)&register_value, sizeof(register_value));
@@ -1641,10 +1835,12 @@ static uint32_t pump_to_1p9v(void *pHandle)
             ui32ErrorStatus = read_data_cmd(pHandle, 0xF0041C, (uint8_t *)&register_value, 0x4);
             if ( ui32ErrorStatus == AM_DEVICES_EM9305_STATUS_SUCCESS )
             {
+                //
                 // Writing decimal 985858 (0x000F0B02) to Addr 0xF0041C does the following:
                 // Configures the internal DC-DC to V-Mult mode.
                 // Sets doubler PWM output to 2X VBAT2 (available options are 1.5X or 2X).
                 // Sets doubler PWM duty cycle to maximum (bits 19:16 = 0xF - strongest drive; available range weakest to strongest is 0x2 to 0xF).
+                //
                 register_value = 985858;
 
                 ui32ErrorStatus = write_data_cmd(pHandle, 0xF0041C, (uint8_t *)&register_value, sizeof(register_value));
@@ -1675,13 +1871,21 @@ static uint32_t pump_to_1p9v(void *pHandle)
 
     return ui32ErrorStatus;
 }
-
+//*****************************************************************************
+//
 // Set a flag to indicate if using 1.9v for NVM programming.
+//
+//*****************************************************************************
 void am_devices_em9305_set_pump_to_1p9v(bool flag)
 {
     g_bump_to_v1p9v = flag;
 }
 
+//*****************************************************************************
+//
+// Update EM9305 firmware
+//
+//*****************************************************************************
 uint32_t am_devices_em9305_update_image(void *pHandle, bool force_update)
 {
     uint32_t ui32ErrorStatus = AM_DEVICES_EM9305_STATUS_SUCCESS;
@@ -1699,7 +1903,9 @@ uint32_t am_devices_em9305_update_image(void *pHandle, bool force_update)
             image_size = g_sEM9305_total_image_len;
         }
 
+        //
         // Enter configuration mode
+        //
         ui32ErrorStatus = enter_cm_mode(pHandle);
         if ( ui32ErrorStatus != AM_DEVICES_EM9305_STATUS_SUCCESS )
         {
@@ -1707,7 +1913,9 @@ uint32_t am_devices_em9305_update_image(void *pHandle, bool force_update)
             break;
         }
 
+        //
         // Check if already programmed
+        //
         if ( force_update || !check_programed(pHandle) )
         {
             am_util_stdio_printf("Updating in progress ...\r\n");
@@ -1717,7 +1925,9 @@ uint32_t am_devices_em9305_update_image(void *pHandle, bool force_update)
                 pump_to_1p9v(pHandle);
             }
 
+            //
             // Erase flash
+            //
             ui32ErrorStatus = erase_entire_nvm_main_area(pHandle);
 
             if ( ui32ErrorStatus != AM_DEVICES_EM9305_STATUS_SUCCESS )
@@ -1726,7 +1936,9 @@ uint32_t am_devices_em9305_update_image(void *pHandle, bool force_update)
                 break;
             }
 
+            //
             // Write data
+            //
             ui32ErrorStatus = write_data_to_nvm(pHandle, image_size);
             if ( ui32ErrorStatus == AM_DEVICES_EM9305_STATUS_SUCCESS )
             {
@@ -1738,7 +1950,9 @@ uint32_t am_devices_em9305_update_image(void *pHandle, bool force_update)
                 break;
             }
 
+            //
             // Check data.
+            //
             ui32ErrorStatus = check_data(pHandle);
             if ( ui32ErrorStatus == AM_DEVICES_EM9305_STATUS_SUCCESS )
             {
@@ -1760,13 +1974,20 @@ uint32_t am_devices_em9305_update_image(void *pHandle, bool force_update)
 
     if ( ui32ErrorStatus == AM_DEVICES_EM9305_STATUS_SUCCESS )
     {
+        //
         // re-configure GPIO15 as input for 12MHz clock from EM9305
+        //
         am_hal_gpio_pinconfig(AM_BSP_GPIO_EM9305_CM, am_hal_gpio_pincfg_input);
     }
 
     return ui32ErrorStatus;
 }
 
+//*****************************************************************************
+//
+// request to enable or disable the EM9305 HSCLK
+//
+//*****************************************************************************
 void am_devices_em9305_hsclk_req(bool enable)
 {
     if ( enable )
@@ -1779,14 +2000,23 @@ void am_devices_em9305_hsclk_req(bool enable)
     }
 }
 
+//*****************************************************************************
+//
 // Read BLE firmware version number
+//
+//*****************************************************************************
 uint32_t am_devices_em9305_get_fw_verion(void *pHandle, uint32_t *image_ver)
 {
     return read_data_cmd(pHandle, EM9305_NVM_INFO_PAGE1_START_ADDR, (uint8_t*)image_ver, EM9305_FW_VER_NUM_LEN);
 }
 
+//*****************************************************************************
+//
 // Update firmware image version to NVM Info page1 after successfully programed
-// The firmware version number is stored in the first 4 bytes in format EM SDK version.xx.xx, such as 3.1.1.0
+// The firmware version number is stored in the first 4 bytes in format
+// EM SDK version.xx.xx, such as 3.1.1.0
+//
+//*****************************************************************************
 uint32_t am_devices_em9305_upate_fw_version(void *pHandle, uint32_t image_ver)
 {
     uint32_t status = AM_DEVICES_EM9305_STATUS_SUCCESS;
@@ -1798,13 +2028,16 @@ uint32_t am_devices_em9305_upate_fw_version(void *pHandle, uint32_t image_ver)
 
     if ( status == AM_DEVICES_EM9305_STATUS_SUCCESS )
     {
-
+        //
         // Erase NVM Info Page 1 before writing
+        //
         status = send_erase_page_cmd(pHandle, EM9305_NVM_INFO_AREA, EM9305_NVM_INFO_AREA_PAGE_1);
 
         if ( status == AM_DEVICES_EM9305_STATUS_SUCCESS )
         {
+            //
             // Write the expected data after erasing NVM INFO Page 1
+            //
             memcpy(read_out_data, (uint8_t *)&image_ver, EM9305_FW_VER_NUM_LEN);
 
             status = write_data_cmd(pHandle, EM9305_NVM_INFO_PAGE1_START_ADDR, read_out_data, EM9305_NVM_INFO_READ_LEN);
@@ -1825,6 +2058,323 @@ uint32_t am_devices_em9305_upate_fw_version(void *pHandle, uint32_t image_ver)
     }
 
     return status;
+}
+
+// The address of register REG_RF_XO_SEQ_DIG
+#define REG_RF_XO_SEQ_DIG_ADDR              (0xF04B88)
+// The address of REG_RF_XO_SEQ_DIG filed in NVM info Page3
+#define REG_RF_XO_SEQ_DIG_INFO_P3_ADDR      (0x407CA0)
+// The address of REG_RF_XO_SEQ_DIG filed in NVM info Page2
+#define REG_RF_XO_SEQ_DIG_INFO_P2_ADDR      (0x405C80)
+
+/* ====================================================
+The format of trim info
+
+|  length   |    CRC    |  Reg Addr |   Data    |
+
+|00 00 00 02|09 c1 6c de|00 f0 4b 88|00 00 0d b2|
+
+Length is 2 words: 1 Addr +_Data record.
+======================================================*/
+
+// The length field in NVM info page2, in word unit
+#define NVM_INFO_P2_LEN_WORDS               (2)
+// The length to update NVM info page2
+#define NVM_INFO_P2_UPDATE_CONTENT_LEN      (20)
+// The length of REG_RF_XO_SEQ_DIG register
+#define REG_RF_XO_SEQ_DIG_LEN               (8)
+// Information area
+#define NVM_ERASE_AREA                      (0x01)
+// Page number in the area
+#define NVM_ERASE_PAGE_NUMBER               (0x02)
+
+//*****************************************************************************
+//
+// Read out the content of REG_RF_XO_SEQ_DIG from NVM info Page3
+//
+//*****************************************************************************
+static uint32_t am_util_ble_read_seq_dig(void *pHandle, uint8_t *seq_dig)
+{
+    uint32_t status = AM_DEVICES_EM9305_STATUS_SUCCESS;
+
+    //
+    // Fill the buffer with the specific command we want to write, and send it.
+    //
+    uint8_t write_cmd[HCI_VSC_CMD_LENGTH(HCI_VSC_READ_AT_ADDRESS_CMD_LENGTH)] = HCI_RAW_CMD(HCI_VSC_READ_AT_ADDRESS_CMD_OPCODE, HCI_VSC_READ_AT_ADDRESS_CMD_LENGTH, UINT32_TO_BYTES(REG_RF_XO_SEQ_DIG_INFO_P3_ADDR), 8);
+
+    uint32_t ui32BytesNum = 0;
+    am_devices_em9305_buffer(16) sResponse = {0};
+
+    status = am_devices_em9305_command_write(pHandle, (uint32_t*)write_cmd, sizeof(write_cmd), sResponse.words, &ui32BytesNum);
+
+    //
+    // The response packet is like this: 04 0E 0C 01 01 FD 00 88 4B F0 00 B2 12 00 00
+    //
+    memcpy(seq_dig, &sResponse.bytes[7], REG_RF_XO_SEQ_DIG_LEN);
+
+    return status;
+}
+
+//*****************************************************************************
+//
+// Erase NVM Info Page2
+//
+//*****************************************************************************
+static uint32_t am_util_ble_erase_info_page_2(void *pHandle)
+{
+    //
+    // Fill the buffer with the specific command we want to write, and send it.
+    //
+    uint8_t write_cmd[HCI_VSC_CMD_LENGTH(HCI_VSC_NVM_ERASE_PAGE_CMD_LENGTH)] = HCI_RAW_CMD(HCI_VSC_NVM_ERASE_PAGE_CMD_OPCODE, HCI_VSC_NVM_ERASE_PAGE_CMD_LENGTH, NVM_ERASE_AREA, NVM_ERASE_PAGE_NUMBER);
+
+    uint32_t ui32BytesNum = 0;
+    am_devices_em9305_buffer(16) sResponse = {0};
+
+    return am_devices_em9305_command_write(pHandle, (uint32_t*)write_cmd, sizeof(write_cmd), sResponse.words, &ui32BytesNum);
+}
+
+//*****************************************************************************
+//
+// Update REG_RF_XO content in NVM Info Page2
+//
+//*****************************************************************************
+static uint32_t am_util_ble_update_info_page2_reg_rf_xo(void *pHandle, uint8_t * seq_dig)
+{
+    uint32_t status = AM_DEVICES_EM9305_STATUS_SUCCESS;
+    uint32_t crc32_seq_dig = 0;
+    uint32_t ui32BytesNum = 0;
+
+    //
+    // Fill the buffer with the specific command we want to write, and send it.
+    //
+    uint8_t write_cmd[HCI_VSC_CMD_LENGTH(HCI_VSC_WRITE_AT_ADDRESS_CMD_LENGTH)] = HCI_RAW_CMD(HCI_VSC_WRITE_AT_ADDRESS_CMD_OPCODE, NVM_INFO_P2_UPDATE_CONTENT_LEN);
+    uint8_t * p_seq_dig_data = write_cmd;
+
+    if ( am_hal_crc32((uint32_t)seq_dig, REG_RF_XO_SEQ_DIG_LEN, &crc32_seq_dig) != AM_HAL_STATUS_SUCCESS )
+    {
+        am_util_stdio_printf("calculate crc fail\r\n");
+
+        return status;
+    }
+
+    p_seq_dig_data += 4; // Skip the header
+
+    UINT32_TO_BSTREAM(p_seq_dig_data, REG_RF_XO_SEQ_DIG_INFO_P2_ADDR);
+    UINT32_TO_BSTREAM(p_seq_dig_data, NVM_INFO_P2_LEN_WORDS);
+    UINT32_TO_BSTREAM(p_seq_dig_data, crc32_seq_dig);
+
+    memcpy(p_seq_dig_data, seq_dig, REG_RF_XO_SEQ_DIG_LEN);
+
+    p_seq_dig_data += REG_RF_XO_SEQ_DIG_LEN;
+
+    am_devices_em9305_buffer(16) sResponse = {0};
+
+    return am_devices_em9305_command_write(pHandle, (uint32_t*)write_cmd, p_seq_dig_data-write_cmd, sResponse.words, &ui32BytesNum);
+}
+
+
+//*****************************************************************************
+//
+// Read out REG_RF_XO_SEQ_DIG register
+//
+//*****************************************************************************
+static uint32_t am_util_ble_read_trim_reg(void *pHandle, uint8_t *seq_dig)
+{
+    uint32_t status = AM_DEVICES_EM9305_STATUS_SUCCESS;
+
+    // Fill the buffer with the specific command we want to write, and send it.
+    uint8_t write_cmd[HCI_VSC_CMD_LENGTH(HCI_VSC_READ_AT_ADDRESS_CMD_LENGTH)] = HCI_RAW_CMD(HCI_VSC_READ_AT_ADDRESS_CMD_OPCODE, HCI_VSC_READ_AT_ADDRESS_CMD_LENGTH, UINT32_TO_BYTES(REG_RF_XO_SEQ_DIG_ADDR), REG_RF_XO_SEQ_DIG_LEN);
+
+    uint32_t ui32BytesNum = 0;
+    am_devices_em9305_buffer(16) sResponse = {0};
+
+    status = am_devices_em9305_command_write(pHandle, (uint32_t*)write_cmd, sizeof(write_cmd), sResponse.words, &ui32BytesNum);
+
+    memcpy(seq_dig, &sResponse.bytes[7], REG_RF_XO_SEQ_DIG_LEN);
+
+    return status;
+}
+
+//*****************************************************************************
+//
+// Set the high frequency crystal trim value based on the tested value
+//
+//*****************************************************************************
+uint32_t am_devices_em9305_crystal_trim_set(void *pHandle, uint8_t trimValue, bool force_update)
+{
+    uint32_t status = AM_DEVICES_EM9305_STATUS_SUCCESS;
+    uint8_t seq_dig[REG_RF_XO_SEQ_DIG_LEN] = {0};
+
+    do
+    {
+        // If it is not a force update, first compare whether the trim value to be set is the same as the existing trim value.
+        // If they are different, perform the update.
+        if ( !force_update )
+        {
+            // Check if the trim value is the same with the new value
+            if ( am_util_ble_read_trim_reg(pHandle, seq_dig) != AM_DEVICES_EM9305_STATUS_SUCCESS )
+            {
+                am_util_stdio_printf("read trim value from register fail\r\n");
+                break;
+            }
+
+            uint8_t trim_value_orig = (seq_dig[0] >> 7) | ((seq_dig[1] & 0x1F) << 1);
+
+            am_util_stdio_printf("original trim value:0x%x, new trim value:0x%x\r\n", trim_value_orig, trimValue);
+
+            if ( trim_value_orig == trimValue )
+            {
+                am_util_stdio_printf("The trim value is already updated \r\n");
+                status = AM_DEVICES_EM9305_STATUS_SUCCESS;
+                break;
+            }
+        }
+
+        // Enter configure mode to erase NVM Info Page2
+        if ( enter_cm_mode(pHandle) != AM_DEVICES_EM9305_STATUS_SUCCESS )
+        {
+            am_util_stdio_printf("Enter config mode fail\r\n");
+            status = AM_DEVICES_EM9305_STATUS_ERROR;
+            break;
+        }
+
+        // Read out the default REG_RF_XO_SEQ_DIG content from NVM Info Page3,
+        // as we only need to change the trim value related bits.
+        // After booting, the parameters in NVM Info Page 3 will be used by default.
+        // If the content in NVM Info Page 2 is modified,
+        // the corresponding parameters in NVM Info Page 2 will be used instead.
+        if ( am_util_ble_read_seq_dig(pHandle, seq_dig) != AM_DEVICES_EM9305_STATUS_SUCCESS )
+        {
+            am_util_stdio_printf("read seq dig from NVM info P3 fail\r\n");
+            status = AM_DEVICES_EM9305_STATUS_ERROR;
+            break;
+        }
+
+        // Trim value is bits 12:7 in REG_RF_XO_SEQ_DIG
+        // Clear existing trim bits at first
+        seq_dig[4] &= ~(1 << 7);                    // Clear bit7 in Byte0
+        seq_dig[5] &= ~0x1F;                        // Clear bits0-4 in Byte1 (0b00011111)
+
+        // Set new trim bits
+        seq_dig[4] |= ((trimValue ) & 0x01) << 7;    // Set MSB (bit5) to Byte0[7]
+        seq_dig[5] |= ((trimValue>>1) & 0x1F);     // Set bits0-4 to Byte1[0-4]
+
+        // Erase NVM Info Page2
+        if ( am_util_ble_erase_info_page_2(pHandle) != AM_DEVICES_EM9305_STATUS_SUCCESS )
+        {
+            am_util_stdio_printf("Erase NVM Info P2 fail\r\n");
+            status = AM_DEVICES_EM9305_STATUS_ERROR;
+            break;
+        }
+
+        // Update the trim value to NVM Info Page2
+        if ( am_util_ble_update_info_page2_reg_rf_xo(pHandle, seq_dig) != AM_DEVICES_EM9305_STATUS_SUCCESS )
+        {
+            am_util_stdio_printf("Write NVM Info P2 fail\r\n");
+            status = AM_DEVICES_EM9305_STATUS_ERROR;
+            break;
+        }
+
+        if ( am_devices_em9305_reset(pHandle) != AM_DEVICES_EM9305_STATUS_SUCCESS )
+        {
+            am_util_stdio_printf("Reset fail\r\n");
+            status = AM_DEVICES_EM9305_RESET_FAIL;
+            break;
+        }
+    } while(0);
+
+    return status;
+}
+
+//*****************************************************************************
+//
+// EM9305 sleep mode control
+//
+//*****************************************************************************
+uint32_t
+am_devices_em9305_sleep_set(void* pHandle, bool enable)
+{
+    uint32_t ui32BytesNum = 0;
+    am_devices_em9305_buffer(16) sResponse = {0};
+    uint32_t ui32ErrorStatus = AM_DEVICES_EM9305_STATUS_SUCCESS;
+
+    uint8_t write_cmd[HCI_VSC_CMD_LENGTH(HCI_VSC_SET_SLEEP_OPTION_CMD_LENGTH)] = HCI_VSC_CMD(HCI_VSC_SET_SLEEP_OPTION, enable);
+    ui32ErrorStatus = am_devices_em9305_command_write(pHandle, (uint32_t*)write_cmd, sizeof(write_cmd), sResponse.words, &ui32BytesNum);
+
+    return ui32ErrorStatus;
+
+}
+
+//*****************************************************************************
+//
+// Disable and shutdown EM9305
+//
+//*****************************************************************************
+void
+am_devices_em9305_shutdown()
+{
+
+    //
+    // decrement counter
+    //
+    am_devices_em9305_request_counter_set(false);
+
+    //
+    // check if there are any other resources using EM9305
+    //
+    if ( am_devices_em9305_request_counter_get() != 0 )
+    {
+        //
+        // do not power off EM9305
+        //
+        return;
+    }
+
+    //
+    // EM9305 shutdown sequence
+    //
+    am_devices_em9305_disable_interrupt();
+    am_devices_em9305_hsclk_req(false); //disable the EM9305 12M clock output
+    am_devices_em9305_disable();
+    am_devices_em9305_term(*g_ppHandle);
+}
+
+//*****************************************************************************
+//
+// Increment or decrement the counter that tracks the component requesting
+// EM9305 to be active
+//
+//*****************************************************************************
+void
+am_devices_em9305_request_counter_set(bool bIncrement)
+{
+    //
+    // Check if we are requesting or releasing the resource
+    //
+    AM_CRITICAL_BEGIN
+    if ( bIncrement )
+    {
+        g_ui32SipCounter += 1;
+    }
+    else
+    {
+        if ( g_ui32SipCounter > 0 )
+        {
+            g_ui32SipCounter -= 1;
+        }
+    }
+    AM_CRITICAL_END
+}
+
+//*****************************************************************************
+//
+// Return the EM9305 resource counter
+//
+//*****************************************************************************
+uint32_t
+am_devices_em9305_request_counter_get()
+{
+    return g_ui32SipCounter;
 }
 
 // End Doxygen group.

@@ -40,7 +40,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #include <string.h>
@@ -129,7 +129,7 @@ static void hciCoreReadMaxDataLen(void)
 void hciCoreResetStart(void)
 {
   /* send an HCI Reset command to start the sequence */
-  HCI_TRACE_INFO0("hciCoreResetStart");
+  HCI_TRACE_INFO0("hciCoreResetStart in func");
   HciResetCmd();
 
   // update Bluetooth Address to controller
@@ -164,42 +164,54 @@ void hciCoreResetSequence(uint8_t *pMsg)
     pMsg++;                   /* skip num packets */
     BSTREAM_TO_UINT16(opcode, pMsg);
     pMsg++;                   /* skip status */
-    HCI_TRACE_INFO0("hciCoreResetSequence opcode 0x%x", opcode);
+
     /* decode opcode */
+    HCI_TRACE_INFO1("hciCoreResetSequence opcode 0x%x", opcode);
+    // Print OGF and OCF
+    HCI_TRACE_INFO1("hciCoreResetSequence OGF 0x%x", HCI_OGF(opcode));
+    HCI_TRACE_INFO1("hciCoreResetSequence OCF 0x%x", HCI_OCF(opcode));
     switch (opcode)
     {
       case HCI_OPCODE_RESET:
         /* initialize rand command count */
         randCnt = 0;
+        HCI_TRACE_INFO0("hciCoreResetSequence RESET");
         /* send next command in sequence */
         HciVscUpdateLinklayerFeature();
         break;
 
       case HCI_VSC_SET_LOCAL_SUP_FEAT_CMD_OPCODE:
+        HCI_TRACE_INFO0("hciCoreResetSequence SET_LOCAL_SUP_FEAT_CMD_OPCODE");
         HciVscSetRfPowerLevelEx(TX_POWER_LEVEL_DEFAULT);
         break;
 
       case HCI_VSC_SET_TX_POWER_LEVEL_CMD_OPCODE:
+        HCI_TRACE_INFO0("hciCoreResetSequence SET_TX_POWER_LEVEL_CMD_OPCODE");
         /* send next command in sequence */
         HciSetEventMaskCmd((uint8_t *) hciEventMask);
+        HCI_TRACE_INFO0("hciCoreResetSequence SET_EVENT_MASK_CMD_OPCODE 2");
         break;
 
       case HCI_OPCODE_SET_EVENT_MASK:
+        HCI_TRACE_INFO0("hciCoreResetSequence SET_EVENT_MASK");
         /* send next command in sequence */
         HciLeSetEventMaskCmd((uint8_t *) hciLeEventMask);
         break;
 
       case HCI_OPCODE_LE_SET_EVENT_MASK:
+        HCI_TRACE_INFO0("hciCoreResetSequence LE_SET_EVENT_MASK");
         /* send next command in sequence */
         HciSetEventMaskPage2Cmd((uint8_t *) hciEventMaskPage2);
         break;
 
       case HCI_OPCODE_SET_EVENT_MASK_PAGE2:
+        HCI_TRACE_INFO0("hciCoreResetSequence SET_EVENT_MASK_PAGE2");
         /* send next command in sequence */
         HciReadBdAddrCmd();
         break;
 
       case HCI_OPCODE_READ_BD_ADDR:
+        HCI_TRACE_INFO0("hciCoreResetSequence READ_BD_ADDR");
         /* parse and store event parameters */
         BdaCpy(hciCoreCb.bdAddr, pMsg);
 
@@ -208,6 +220,7 @@ void hciCoreResetSequence(uint8_t *pMsg)
         break;
 
       case HCI_OPCODE_LE_READ_BUF_SIZE:
+        HCI_TRACE_INFO0("hciCoreResetSequence LE_READ_BUF_SIZE");
         /* parse and store event parameters */
         BSTREAM_TO_UINT16(hciCoreCb.bufSize, pMsg);
         BSTREAM_TO_UINT8(hciCoreCb.numBufs, pMsg);
@@ -220,6 +233,7 @@ void hciCoreResetSequence(uint8_t *pMsg)
         break;
 
       case HCI_OPCODE_LE_READ_SUP_STATES:
+        HCI_TRACE_INFO0("hciCoreResetSequence LE_READ_SUP_STATES");
         /* parse and store event parameters */
         memcpy(hciCoreCb.leStates, pMsg, HCI_LE_STATES_LEN);
 
@@ -228,6 +242,7 @@ void hciCoreResetSequence(uint8_t *pMsg)
         break;
 
       case HCI_OPCODE_LE_READ_WHITE_LIST_SIZE:
+        HCI_TRACE_INFO0("hciCoreResetSequence LE_READ_WHITE_LIST_SIZE");
         /* parse and store event parameters */
         BSTREAM_TO_UINT8(hciCoreCb.whiteListSize, pMsg);
 
@@ -236,6 +251,7 @@ void hciCoreResetSequence(uint8_t *pMsg)
         break;
 
       case HCI_OPCODE_LE_READ_LOCAL_SUP_FEAT:
+        HCI_TRACE_INFO0("hciCoreResetSequence LE_READ_LOCAL_SUP_FEAT");
         /* parse and store event parameters */
         BSTREAM_TO_UINT64(hciCoreCb.leSupFeat, pMsg);
 
@@ -244,7 +260,8 @@ void hciCoreResetSequence(uint8_t *pMsg)
         break;
 
       case HCI_OPCODE_LE_READ_RES_LIST_SIZE:
-        /* parse and store event parameters */
+        HCI_TRACE_INFO0("hciCoreResetSequence LE_READ_RES_LIST_SIZE");
+            /* parse and store event parameters */
         BSTREAM_TO_UINT8(hciCoreCb.resListSize, pMsg);
 
         /* send next command in sequence */
@@ -255,7 +272,7 @@ void hciCoreResetSequence(uint8_t *pMsg)
         {
           uint16_t maxTxOctets;
           uint16_t maxTxTime;
-
+          HCI_TRACE_INFO0("hciCoreResetSequence LE_READ_MAX_DATA_LEN");
           BSTREAM_TO_UINT16(maxTxOctets, pMsg);
           BSTREAM_TO_UINT16(maxTxTime, pMsg);
 
@@ -268,6 +285,7 @@ void hciCoreResetSequence(uint8_t *pMsg)
         break;
 
       case HCI_OPCODE_LE_WRITE_DEF_DATA_LEN:
+        HCI_TRACE_INFO0("hciCoreResetSequence LE_WRITE_DEF_DATA_LEN");
         if (hciCoreCb.extResetSeq)
         {
           /* send first extended command */
@@ -289,6 +307,7 @@ void hciCoreResetSequence(uint8_t *pMsg)
       case HCI_OPCODE_LE_READ_NUM_SUP_ADV_SETS:
       case HCI_OPCODE_LE_READ_PER_ADV_LIST_SIZE:
       case HCI_OPCODE_READ_LOCAL_VER_INFO:
+        HCI_TRACE_INFO0("hciCoreResetSequence LE_READ_MAX_ADV_DATA_LEN");
         if (hciCoreCb.extResetSeq)
         {
           /* send next extended command in sequence */
@@ -297,6 +316,7 @@ void hciCoreResetSequence(uint8_t *pMsg)
         break;
 
       case HCI_OPCODE_LE_RAND:
+        HCI_TRACE_INFO0("hciCoreResetSequence LE_RAND");
         /* check if need to send second rand command */
         if (randCnt < (HCI_RESET_RAND_CNT-1))
         {
@@ -316,6 +336,7 @@ void hciCoreResetSequence(uint8_t *pMsg)
       default:
         break;
     }
+    HCI_TRACE_INFO0("hciCoreResetSequence END");
   }
 }
 

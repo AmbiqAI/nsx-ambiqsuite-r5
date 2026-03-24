@@ -29,6 +29,8 @@
 #ifndef HCI_DEFS_H
 #define HCI_DEFS_H
 
+#include "cfg_stack.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -347,6 +349,20 @@ extern "C" {
 #define HCI_OCF_LE_SET_PATH_LOSS_REPORTING_PARAMS    0x78
 #define HCI_OCF_LE_SET_PATH_LOSS_REPORTING_ENABLE    0x79
 #define HCI_OCF_LE_SET_TX_POWER_REPORT_ENABLE        0x7A
+#if (BT_53)
+/* Version 5.3 */
+#define HCI_OCF_LE_SET_DEFAULT_SUBRATE               0x7D
+#define HCI_OCF_LE_SUBRATE_REQ                       0x7E
+#endif // BT_53
+#if (BT_54)
+/* Version 5.4 */
+#define HCI_OCF_LE_SET_EXT_ADV_PARAM_V2              0x7F
+#define HCI_OCF_LE_SET_PER_ADV_SUB_EVT_DATA          0x82
+#define HCI_OCF_LE_SET_PER_ADV_RSP_DATA              0x83
+#define HCI_OCF_LE_SET_PER_SYNC_SUB_EVT              0x84
+#define HCI_OCF_LE_EXT_CREATE_CONN_V2                0x85
+#define HCI_OCF_LE_SET_PER_ADV_PARAM_V2              0x86
+#endif // BT_54
 /**@}*/
 
 /** \name Opcode manipulation macros
@@ -512,6 +528,20 @@ extern "C" {
 #define HCI_OPCODE_LE_SET_PATH_LOSS_REPORTING_PARAMS HCI_OPCODE(HCI_OGF_LE_CONTROLLER, HCI_OCF_LE_SET_PATH_LOSS_REPORTING_PARAMS)
 #define HCI_OPCODE_LE_SET_PATH_LOSS_REPORTING_ENABLE HCI_OPCODE(HCI_OGF_LE_CONTROLLER, HCI_OCF_LE_SET_PATH_LOSS_REPORTING_ENABLE)
 #define HCI_OPCODE_LE_SET_TX_POWER_REPORT_ENABLE     HCI_OPCODE(HCI_OGF_LE_CONTROLLER, HCI_OCF_LE_SET_TX_POWER_REPORT_ENABLE)
+#if (BT_53)
+/*! \brief New in version 5.3 */
+#define HCI_OPCODE_LE_SET_DEFAULT_SUBRATE            HCI_OPCODE(HCI_OGF_LE_CONTROLLER, HCI_OCF_LE_SET_DEFAULT_SUBRATE)
+#define HCI_OPCODE_LE_SUBRATE_REQ                    HCI_OPCODE(HCI_OGF_LE_CONTROLLER, HCI_OCF_LE_SUBRATE_REQ)
+#endif // BT_53
+#if (BT_54)
+/*! \brief New in version 5.4 */
+#define HCI_OPCODE_LE_SET_EXT_ADV_PARAM_V2           HCI_OPCODE(HCI_OGF_LE_CONTROLLER, HCI_OCF_LE_SET_EXT_ADV_PARAM_V2)
+#define HCI_OPCODE_LE_SET_PER_ADV_SUB_EVT_DATA       HCI_OPCODE(HCI_OGF_LE_CONTROLLER, HCI_OCF_LE_SET_PER_ADV_SUB_EVT_DATA)
+#define HCI_OPCODE_LE_SET_PER_ADV_RSP_DATA           HCI_OPCODE(HCI_OGF_LE_CONTROLLER, HCI_OCF_LE_SET_PER_ADV_RSP_DATA)
+#define HCI_OPCODE_LE_SET_PER_SYNC_SUB_EVT           HCI_OPCODE(HCI_OGF_LE_CONTROLLER, HCI_OCF_LE_SET_PER_SYNC_SUB_EVT)
+#define HCI_OPCODE_LE_EXT_CREATE_CONN_V2             HCI_OPCODE(HCI_OGF_LE_CONTROLLER, HCI_OCF_LE_EXT_CREATE_CONN_V2)
+#define HCI_OPCODE_LE_SET_PER_ADV_PARAM_V2           HCI_OPCODE(HCI_OGF_LE_CONTROLLER, HCI_OCF_LE_SET_PER_ADV_PARAM_V2)
+#endif // BT_54
 /**@}*/
 
 /** \name Packetcraft Vendor Specific
@@ -670,6 +700,21 @@ extern "C" {
 #define HCI_LEN_LE_ISO_READ_TEST_COUNTERS            2
 #define HCI_LEN_LE_ISO_TEST_END                      2
 #define HCI_LEN_LE_SET_HOST_FEATURE                  2
+
+#if (BT_53)
+/*! \brief New in version 5.3 */
+#define HCI_LEN_LE_SET_DEFAULT_SUBRATE               10
+#define HCI_LEN_LE_SUBRATE_REQ                       12
+#endif // BT_53
+#if (BT_54)
+/*! \brief New in version 5.4 */
+#define HCI_LEN_LE_SET_EXT_ADV_PARAM_V2              27
+#define HCI_LEN_LE_SET_PER_ADV_SUB_EVT_DATA(len)     (6 + (len))
+#define HCI_LE_LE_SET_PER_SYNC_SUB_EVT(len)          (5 + (len))
+#define HCI_LE_SET_PER_ADV_RSP_DATA_EVT(len)         (8 + (len))
+#define HCI_LEN_LE_SET_PER_ADV_PARAM_V2              12
+#define HCI_LEN_LE_EXT_CREATE_CONN_V2(numPhys)       (12 + (16 * (numPhys)))
+#endif // BT_54
 /**@}*/
 
 /** \name Events
@@ -733,6 +778,21 @@ extern "C" {
 #define HCI_LE_PATH_LOSS_REPORT_EVT                  0x20
 #define HCI_LE_POWER_REPORT_EVT                      0x21
 #define HCI_LE_BIG_INFO_ADV_REPORT_EVT               0x22
+#if (BT_53)
+/*! \brief New Version 5.3 */
+#define HCI_LE_SUBRATE_CHANGE_EVT                    0x23
+#endif // BT_53
+
+#if (BT_54)
+/*! \brief New Version 5.4 */
+#define HCI_LE_PER_ADV_SYNC_EST_EVT_V2               0x24
+#define HCI_LE_PER_ADV_REPORT_EVT_V2                 0x25
+#define HCI_LE_PER_SYNC_TRSF_RCVD_EVT_V2             0x26
+#define HCI_LE_PRE_ADV_SUBEVT_DATA_REQ_EVT           0x27
+#define HCI_LE_PER_ADV_RSP_REPORT_EVT                0x28
+#define HCI_LE_ENHANCED_CONN_CMPL_EVT_V2             0x29
+#endif // BT_54
+
 /**@}*/
 
 /** \name Event parameter lengths
@@ -784,6 +844,10 @@ extern "C" {
 #define HCI_LEN_LE_POWER_REPORT                      9       /*!< Power reporting event length. */
 #define HCI_LEN_LE_PATH_LOSS_ZONE                    5       /*!< Path loss reporting event length. */
 #define HCI_LEN_LE_BIG_INFO_ADV_REPORT               20      /*!< BIG Info advertising report length. */
+#if (BT_53)
+/* Version 5.3 */
+#define HCI_LEN_LE_SUBRATE_CHANGE                    12      /*!< LE subrate change event length. */
+#endif // BT_53
 
 /**@}*/
 
@@ -934,6 +998,15 @@ extern "C" {
 #define HCI_SUP_READ_LOCAL_SUP_CODEC_CAP             0x04    /*!< Byte 45 */
 #define HCI_SUP_READ_LOCAL_SUP_CTR_DLY               0x08    /*!< Byte 45 */
 #define HCI_SUP_CONFIG_DATA_PATH                     0x10    /*!< Byte 45 */
+#if (BT_53)
+/* Version 5.3 */
+#define HCI_SUP_LE_SET_DEFAULT_SUBRATE               0x01    /*!< Byte 46 */
+#define HCI_SUP_LE_SUBRATE_REQ                       0x02    /*!< Byte 46 */
+#endif // BT_53
+#if (BT_54)
+/* Version 5.4 */
+#define HCI_SUP_LE_SET_EXT_ADV_PARAM_V2              0x04    /*!< Byte 46 */
+#endif // BT_54
 
 #define HCI_SUP_CMD_LEN                              64      /*!< Byte length of support cmd field. */
 
@@ -963,7 +1036,7 @@ extern "C" {
  *
  */
 /**@{*/
-#define HCI_EVT_MASK_LE_CONN_CMPL_EVT                0x01    /*!< Byte 0 */
+#define HCI_EVT_MASK_LE_CONN_CMPL_EVT                0x01    /*!< Bycte 0 */
 #define HCI_EVT_MASK_LE_ADV_REPORT_EVT               0x02    /*!< Byte 0 */
 #define HCI_EVT_MASK_LE_CONN_UPDATE_CMPL_EVT         0x04    /*!< Byte 0 */
 #define HCI_EVT_MASK_LE_READ_REMOTE_FEAT_CMPL_EVT    0x08    /*!< Byte 0 */
@@ -1003,6 +1076,21 @@ extern "C" {
 
 #define HCI_EVT_MASK_LE_TX_POWER_REPORT_EVT          0x01    /*!< Byte 4 (Bit 32)*/
 #define HCI_EVT_MASK_LE_BIG_INFO_ADV_RPT_EVT         0x02    /*!< Byte 4 */
+
+#if (BT_53)
+/* Version 5.3 */
+#define HCI_EVT_MASK_LE_SUBRATE_CHANGE_EVT           0x04    /*!< Byte 4 (Bit 34)*/
+#endif // BT_53
+#if (BT_54)
+/* Version 5.4 */
+#define HCI_EVT_MASK_LE_PER_ADV_SYNC_EST_EVT_V2      0x08    /*!< Byte 4 (Bit 35) */
+#define HCI_EVT_MASK_LE_PER_ADV_REPORT_EVT_V2        0x10    /*!< Byte 4 (Bit 36) */
+#define HCI_EVT_MASK_LE_PER_SYNC_TRSF_RCVT_EVT_V2    0x20    /*!< Byte 4 (Bit 37) */
+#define HCI_EVT_MASK_LE_PER_ADV_SUBEVT_DATA_REQ_EVT  0x40    /*!< Byte 4 (Bit 38) */
+#define HCI_EVT_MASK_LE_PER_ADV_RSP_REP_EVT          0x80    /*!< Byte 4 (Bit 39) */
+
+#define HCI_EVT_MASK_LE_ENHANCED_CONN_CMPL_EVT_V2    0x01    /*!< Byte 5 (Bit 40) */
+#endif // BT_54
 
 /**@}*/
 
@@ -1060,8 +1148,8 @@ extern "C" {
 /* Version 5.4  */
 #define HCI_LE_SUP_FEAT_ADV_CODING_SELECTION                0x0000010000000000  /*!<Advertising Coding Selection */
 #define HCI_LE_SUP_FEAT_ADV_CODING_SELECTION_HOST_SUPPORT   0x0000020000000000  /*!<Advertising Coding Selection (Host Support) */
-#define HCI_LE_SUP_FEAT_PER_ADV_WITH_RESP_ADVERTISER        0x0000080000000000  /*!<Periodic Advertising with Responses - Advertiser */
-#define HCI_LE_SUP_FEAT_PER_ADV_WITH_RESP_SCANNER           0x0000100000000000  /*!<Periodic Advertising with Responses - Scanner */
+#define HCI_LE_SUP_FEAT_PER_ADV_WITH_RESP_ADVERTISER        0x0000040000000000  /*!<Periodic Advertising with Responses - Advertiser */
+#define HCI_LE_SUP_FEAT_PER_ADV_WITH_RESP_SCANNER           0x0000080000000000  /*!<Periodic Advertising with Responses - Scanner */
 
 /**@}*/
 
@@ -1340,8 +1428,13 @@ extern "C" {
 */
 /**@{*/
 #define HCI_SYNC_TRSF_MODE_OFF                       0x00   /*!< \brief Periodic sync transfer receive is disabled */
-#define HCI_SYNC_TRSF_MODE_REP_DISABLED              0x01,  /*!< \brief Periodic sync transfer receive is enabled, report event is disabled */
-#define HCI_SYNC_TRSF_MODE_REP_ENABLED               0x02,  /*!< \brief Periodic sync transfer receive is enabled, report event is enabled */
+#define HCI_SYNC_TRSF_MODE_REP_DISABLED              0x01   /*!< \brief Periodic sync transfer receive is enabled, report event is disabled */
+#define HCI_SYNC_TRSF_MODE_REP_ENABLED               0x02   /*!< \brief Periodic sync transfer receive is enabled, report event is enabled */
+#if (BT_53)
+#define HCI_SYNC_TRSF_MODE_REP_DUP_FILT_ENABLE       0x03   /*!< \brief Periodic sync transfer receive is enabled, report event is enabled, with duplicate filtering enabled*/
+#endif // BT_53
+
+
 /**@}*/
 
 /** \name Periodic advertising create sync options bits
@@ -1350,7 +1443,34 @@ extern "C" {
 /**@{*/
 #define HCI_OPTIONS_FILT_POLICY_BIT                  (1<<0)  /*!< \brief filter policy bit */
 #define HCI_OPTIONS_INIT_RPT_ENABLE_BIT              (1<<1)  /*!< \brief initial periodic advertisement reporting bit */
+#if (BT_53)
+#define HCI_OPTIONS_INIT_DUP_FILT_BIT                (1<<2)  /*!< \brief initial duplicate filterling bit */
+#define HCI_OPTION_SYNC_REP_ENABLE_BIT               (1<<0)  /*!< \brief report enable bit for periodic advertising train, updated in Core5.3 */
+#define HCI_OPTIONS_SYNC_DUP_FILT_BIT                (1<<1)  /*!< \brief duplicate filter enable bit for periodic advertising train, updated in Core5.3 */
+#endif // BT_53
 /**@}*/
+
+#if BT_54
+/**@}*/
+
+/** \name Periodic advertising parameter command V2 parameter definitions
+*
+*/
+/**@{*/
+#define HCI_PER_ADV_NUM_SUB_EVT_MIN                  (0x00)  /*!< \brief minimum number of subevents */
+#define HCI_PER_ADV_NUM_SUB_EVT_MAX                  (0x80)  /*!< \brief maximum number of subevents */
+#define HCI_PER_ADV_SUB_EVT_INT_MIN                  (0x06)  /*!< \brief mimimum interval between subevents, in 1.25ms unit */
+#define HCI_PER_ADV_SUB_EVT_INT_MAX                  (0xFF)  /*!< \brief maximum interval between subevents, in 1.25ms unit */
+#define HCI_PER_ADV_RSP_SLOT_DELAY_MIN               (0x01)  /*!< \brief minimum time between the advertising packet in a subevent and the first response slot, in 1.25ms unit */
+#define HCI_PER_ADV_RSP_SLOT_DELAY_MAX               (0xFE)  /*!< \brief maximum time between the advertising packet in a subevent and the first response slot, in 1.25ms unit */
+#define HCI_PER_ADV_RSP_SLOT_PACE_MIN                (0x02)  /*!< \brief minimum time between response slots, in 1.25ms unit */
+#define HCI_PER_ADV_RSP_SLOT_PACE_MAX                (0xFF)  /*!< \brief maximum time between response slots, in 1.25ms unit */
+#define HCI_PER_ADV_RSP_NUM_RSP_SLOT_MIN             (0x00)  /*!< \brief minimum number of subevent response slots */
+#define HCI_PER_ADV_RSP_NUM_RSP_SLOT_MAX             (0xFF)  /*!< \brief maximum number of subevent response slots */
+
+/**@}*/
+#endif // BT_54
+
 
 /** \name Misc command parameters
  *
@@ -1407,6 +1527,10 @@ extern "C" {
 #define HCI_PHY_OPTIONS_NONE                         0x00    /*!< \brief No preferences */
 #define HCI_PHY_OPTIONS_S2_PREFERRED                 0x01    /*!< \brief S=2 coding preferred when transmitting on LE Coded PHY */
 #define HCI_PHY_OPTIONS_S8_PREFERRED                 0x02    /*!< \brief S=8 coding preferred when transmitting on LE Coded PHY */
+#if (BT_54)
+#define HCI_PHY_OPTIONS_S2_REQUIRED                  0x03    /*!< \brief S=2 coding required when transmitting on LE Coded PHY */
+#define HCI_PHY_OPTIONS_S8_REQUIRED                  0x04    /*!< \brief S=8 coding required when transmitting on LE Coded PHY */
+#endif // BT_54
 /**@}*/
 
 /** \name CTE Slot Durations
@@ -1692,6 +1816,45 @@ extern "C" {
 #define HCI_ID_LC3                                   0x01    /*!< LC3 ID */
 #define HCI_ID_VS                                    0xFF    /*!< Vendor specific ID */
 /**@}*/
+
+#if (BT_53)
+/** \name Periodic Advertising Enable bit
+ *
+ */
+/**@{*/
+#define HCI_LE_SET_PER_ADV_ENABLE_ENABLE             (1<<0)  /*!< \brief  LE Set Periodic Advertising Enable command "Enable"bit0, enable periodic advertising */
+#define HCI_LE_SET_PER_ADV_ENABLE_ADI                (1<<1)  /*!< \brief  LE Set Periodic Advertising Enable command "Enable"bit1, include the ADI field in AUX_SYNC_IND PDUs */
+/**@}*/
+
+/** \name  Set Periodic Advertising Sync Transfer Parameters CTE_type bit
+ *
+ */
+/**@{*/
+#define HCI_LE_SET_PER_ADV_NOT_SYNC_CTE_AOA             (1<<0)  /*!< \brief  Do not sync to packets with an AoA Constant Tone Extension */
+#define HCI_LE_SET_PER_ADV_NOT_SYNC_CTE_AOD_1US         (1<<1)  /*!< \brief  Do not sync to packets with an AoD Constant Tone Extension with 1 μs slots */
+#define HCI_LE_SET_PER_ADV_NOT_SYNC_CTE_AOD_2US         (1<<2)  /*!< \brief  Do not sync to packets with an AoD Constant Tone Extension with 2 μs slots */
+#define HCI_LE_SET_PER_ADV_NOT_SYNC_WITHOUT_CTE         (1<<3)  /*!< \brief  Do not sync to packets without a Constant Tone Extension */
+#define HCI_LE_SET_PER_ADV_NOT_SYNC_ALL                 (HCI_LE_SET_PER_ADV_NOT_SYNC_CTE_AOA|HCI_LE_SET_PER_ADV_NOT_SYNC_CTE_AOD_1US|HCI_LE_SET_PER_ADV_NOT_SYNC_CTE_AOD_2US|HCI_LE_SET_PER_ADV_NOT_SYNC_WITHOUT_CTE)
+/**@}*/
+
+#endif // BT_53
+
+#if (BT_54)
+/** \name  Set Periodic Advertising Subevent Data command
+ *
+ */
+/**@{*/
+
+#define HCI_LE_SET_SUB_EVT_DATA_NUM_MAX                 (0x0F)
+/**@}*/
+
+/** \name  Periodic Advertising Response Report Data Length offset
+ *
+ */
+/**@{*/
+#define HCI_PER_ADV_RSP_RPT_DATA_LEN_OFFSET              5
+/**@}*/
+#endif // BT_54
 
 /* \} */    /* STACK_HCI_API */
 

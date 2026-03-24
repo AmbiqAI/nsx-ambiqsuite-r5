@@ -2,7 +2,7 @@
 //
 //! @file am_bsp.h
 //!
-//! @brief Functions to aid with configuring the GPIOs.
+//! @brief Top level functions for performing board initialization.
 //!
 //! @addtogroup Apollo510 Evaluation Board BSP Board Support Package (BSP)
 //! @ingroup BSP
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -163,13 +163,21 @@ extern const am_hal_gpio_pincfg_t g_AM_VALIDATION_GPIO;
 
 //*****************************************************************************
 //
-// Definition of USBPHY Clock Source for High-Speed mode
-//
-// The Apollo510 EVB has a 48MHz Crystal, so we will use XTAL_HS / 2 as the
-// reference clock. For full-speed, HFRC_24M can be used for lower power.
+// UART macro definitions for UART Examples
 //
 //*****************************************************************************
-#define AM_BSP_USBPHY_CLK_SRC       AM_HAL_USB_PHYCLKSRC_XTAL_HS_DIV2
+#define TEST_UART_TX_MODULE     3
+#define TEST_UART_RX_MODULE     0
+//*****************************************************************************
+//
+// Definition of USBPHY Clock Source
+//
+// By setting to AM_HAL_USB_PHYCLKSRC_DEFAULT allow auto configuration which
+// will determine the clock source for USBPHY based on USB mode and clock
+// source available on the board based on BSP configuration.
+//
+//*****************************************************************************
+#define AM_BSP_USBPHY_CLK_SRC       AM_HAL_USB_PHYCLKSRC_DEFAULT
 //#define AM_BSP_USBPHY_CLK_SRC       AM_HAL_USB_PHYCLKSRC_HFRC_24M
 
 //*****************************************************************************
@@ -202,6 +210,10 @@ extern const am_hal_gpio_pincfg_t g_AM_VALIDATION_GPIO;
 #if AM_BSP_NUM_BUTTONS
 extern am_devices_button_t am_bsp_psButtons[AM_BSP_NUM_BUTTONS];
 #endif
+#define AM_BSP_BUTTON0_IRQ                  GPIO0_405F_IRQn
+#define am_bsp_button0_isr                  am_gpio0_405f_isr
+#define AM_BSP_BUTTON1_IRQ                  GPIO0_405F_IRQn
+#define am_bsp_button1_isr                  am_gpio0_405f_isr
 
 //*****************************************************************************
 //
@@ -227,13 +239,24 @@ extern am_devices_led_t am_bsp_psLEDs[AM_BSP_NUM_LEDS];
 //*****************************************************************************
 #define AM_BSP_MSPI_FLASH_DEVICE_IS25WX064
 #define AM_BSP_MSPI_FLASH_MODULE            1
+#define AM_BSP_MSPI_FLASH_PRESENT
+
+//*****************************************************************************
+//
+// DISPLAY MIPI OUTPUT LANE definitions.
+//
+//*****************************************************************************
+#define AM_BSP_DISP_SINGLE_LANE_MODE        1
+#define AM_BSP_DISP_DUAL_LANE_MODE          2
+
+#define AM_BSP_DISP_OUTPUT_MODE_TYPE        AM_BSP_DISP_SINGLE_LANE_MODE
 
 //*****************************************************************************
 //
 // Touch interface definitions.
 //
 //*****************************************************************************
-#define AM_BSP_TP_IOM_MODULE                0
+#define AM_BSP_TP_IOM_MODULE                2
 
 //*****************************************************************************
 //

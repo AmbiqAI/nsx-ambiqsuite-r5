@@ -60,29 +60,36 @@ static void dmPhyActPhyUpdate(dmConnCcb_t *pCcb, hciEvt_t *pEvent);
  *  \return None.
  */
 /*************************************************************************************************/
+#include "ns_ambiqsuite_harness.h"
 void dmPhyHciHandler(hciEvt_t *pEvent)
 {
   dmConnCcb_t *pCcb;
-
+  ns_lp_printf("dmPhyHciHandler 0x%x\n", pEvent);
   if (pEvent->hdr.event == HCI_LE_SET_DEF_PHY_CMD_CMPL_CBACK_EVT)
   {
+    ns_lp_printf("dmPhyHciHandler: HCI_LE_SET_DEF_PHY_CMD_CMPL_CBACK_EVT\n");
     dmPhyActDefPhySet(pEvent);
+    ns_lp_printf("dmPhyHciHandler: dmPhyActDefPhySet\n");
   }
   /* look up ccb from conn handle */
   else if ((pCcb = dmConnCcbByHandle(pEvent->hdr.param)) != NULL)
   {
     /* handle incoming event */
+    ns_lp_printf("dmPhyHciHandler: dmConnCcbByHandle\n");
     switch (pEvent->hdr.event)
     {
       case HCI_LE_READ_PHY_CMD_CMPL_CBACK_EVT:
+        ns_lp_printf("dmPhyHciHandler: HCI_LE_READ_PHY_CMD_CMPL_CBACK_EVT\n");
         dmPhyActPhyRead(pCcb, pEvent);
         break;
 
       case HCI_LE_PHY_UPDATE_CMPL_CBACK_EVT:
+        ns_lp_printf("dmPhyHciHandler: HCI_LE_PHY_UPDATE_CMPL_CBACK_EVT\n");
         dmPhyActPhyUpdate(pCcb, pEvent);
         break;
 
       default:
+        ns_lp_printf("dmPhyHciHandler: default\n");
         /* should never get here */
         break;
     }

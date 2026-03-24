@@ -26,6 +26,7 @@
 
 #include "util/bda.h"
 #include "wsf_os.h"
+#include "cfg_stack.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,9 +58,12 @@ extern "C" {
 #define DM_ID_BIS                     18
 #define DM_ID_BIS_SYNC                19
 #define DM_ID_ISO                     20
+#if (BT_54)
+#define DM_ID_EAD                     21
+#define DM_NUM_IDS                    22
+#else
 #define DM_NUM_IDS                    21
-
-#define DM_ID_REQ_SCA                 22
+#endif // BT_54
 
 /* Start of component message enumeration */
 #define DM_MSG_START(id)              ((id) << 3)
@@ -119,6 +123,11 @@ typedef struct
 
   /* LL Privacy */
   bool_t              llPrivEnabled;
+
+#if (BT_54)
+  uint8_t             advHandle;
+  uint8_t             subEvent;
+#endif // BT_54
 } dmCb_t;
 
 /**************************************************************************************************

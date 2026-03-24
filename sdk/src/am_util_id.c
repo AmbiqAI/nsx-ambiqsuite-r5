@@ -2,14 +2,47 @@
 //
 //! @file am_util_id.c
 //!
-//! @brief Identification of the Ambiq Micro device.
+//! @brief Device Identification Utility Functions
 //!
-//! This module contains functions for run time identification of Ambiq Micro
-//! devices.
-//!
-//! @addtogroup id ID - Identification
+//! @addtogroup id_utils ID Utility Functions
 //! @ingroup utils
 //! @{
+//!
+//! Purpose: This module provides device identification utilities for
+//!          Ambiq Micro devices. It enables chip ID reading, version
+//!          identification, and feature detection for system configuration
+//!          and compatibility checking. The utilities support detailed
+//!          device information retrieval and verification.
+//!
+//! @section utils_id_features Key Features
+//!
+//! 1. @b Chip @b ID: Device identification capabilities.
+//! 2. @b Version @b Check: Silicon revision detection.
+//! 3. @b Feature @b Detection: Available feature identification.
+//! 4. @b Compatibility: System compatibility checking.
+//! 5. @b Security @b Info: Device security status retrieval.
+//!
+//! @section utils_id_functionality Functionality
+//!
+//! - Read device identification
+//! - Check silicon revisions
+//! - Detect available features
+//! - Verify system compatibility
+//! - Access security information
+//!
+//! @section utils_id_usage Usage
+//!
+//! 1. Get device ID with am_util_id_device()
+//! 2. Check silicon revision
+//! 3. Verify feature availability
+//! 4. Validate compatibility
+//!
+//! @section utils_id_configuration Configuration
+//!
+//! - Define ID check parameters
+//! - Configure feature detection
+//! - Set compatibility requirements
+//! - Enable security checks
 //
 //*****************************************************************************
 
@@ -47,7 +80,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #include <stdint.h>
@@ -90,6 +123,13 @@ static const uint8_t g_DeviceNameApollo4l[]   = "Apollo4 Lite";
 static const uint8_t g_DeviceNameApollo510[]   = "Apollo510";
 static const uint8_t g_DeviceNameApollo510B[]  = "Apollo510B";
 #endif // AM_ID_APOLLO510
+#if defined(AM_ID_APOLLO330P_510L)
+static const uint8_t g_DeviceNameApollo330P[] = "Apollo330P";
+static const uint8_t g_DeviceNameApollo510L[] = "Apollo510 Lite";
+#endif // AM_ID_APOLLO330P_510L
+#if defined(AM_ID_APOLLO510L_CM4)
+static const uint8_t g_DeviceNameApollo510L_cm4[] = "Apollo5 Lite CM4";
+#endif // AM_ID_APOLLO510L_CM4
 
 #ifdef AM_ID_PKGSTD
 //
@@ -103,7 +143,7 @@ static const uint8_t g_ui8VendorNameAmbq[]    = "AMBQ";
 static const uint8_t g_ui8VendorNameUnknown[] = "????";
 static const uint8_t g_ui8DeviceNameUnknown[] = "Unknown device";
 
-#if !defined(AM_ID_APOLLO) && !defined(AM_ID_APOLLO2)
+#if !defined(AM_ID_APOLLO) && !defined(AM_ID_APOLLO2) && !defined(AM_ID_APOLLO510L_CM4)
 //*****************************************************************************
 // Return the major version of the chip rev.
 // Returns: 'A', 'B', 'C', ...
@@ -186,6 +226,7 @@ am_util_id_device(am_util_id_t *psIDDevice)
     //
     ui32PN = psIDDevice->sMcuCtrlDevice.ui32ChipPN  &
              AM_UTIL_MCUCTRL_CHIP_INFO_PARTNUM_PN_M;
+
 #if !defined(AM_ID_APOLLO) && !defined(AM_ID_APOLLO2)
     ui32ChipRev = psIDDevice->sMcuCtrlDevice.ui32ChipRev;
 #endif
@@ -324,6 +365,39 @@ am_util_id_device(am_util_id_t *psIDDevice)
             chiprev_set(psIDDevice, 1);
         }
 #endif // AM_ID_APOLLO510
+
+#if defined(AM_ID_APOLLO330P_510L)
+        if ( (ui32PN == AM_UTIL_MCUCTRL_CHIP_INFO_PARTNUM_APOLLO330P_510L)  &&
+             ((psIDDevice->sMcuCtrlDevice.ui32JedecPN & 0xFF0) == 0xE90)    &&
+             (revmaj_get(ui32ChipRev) == 'A') )
+        {
+            bool b330P = _FLD2VAL(MCUCTRL_CHIPPN_DEVTYPE, psIDDevice->sMcuCtrlDevice.ui32ChipPN) ? true : false;
+            if ( b330P )
+            {
+                psIDDevice->ui32Device = AM_UTIL_ID_APOLLO330P;
+                psIDDevice->pui8DeviceName = g_DeviceNameApollo330P;
+                chiprev_set(psIDDevice, 1);
+            }
+            else
+            {
+                psIDDevice->ui32Device = AM_UTIL_ID_APOLLO510L;
+                psIDDevice->pui8DeviceName = g_DeviceNameApollo510L;
+                chiprev_set(psIDDevice, 1);
+            }
+        }
+#endif // AM_ID_APOLLO330P
+
+#if defined(AM_ID_APOLLO510L_CM4)
+        //if ( ( ui32PN == AM_UTIL_MCUCTRL_CHIP_INFO_PARTNUM_APOLLO510L_CM4)          &&
+        //          ((psIDDevice->sMcuCtrlDevice.ui32JedecPN & 0x0FF) == 0x0D2)   &&
+        //          ( revmaj_get(ui32ChipRev) == 'B' ) )
+        {
+            psIDDevice->ui32Device = AM_UTIL_ID_APOLLO510L_CM4;
+            psIDDevice->pui8DeviceName = g_DeviceNameApollo510L_cm4;
+            chiprev_set(psIDDevice, 1);
+        }
+#endif // AM_ID_APOLLO510L_CM4
+
     //
     // This section defines the package type
     //

@@ -34,6 +34,7 @@
 /* hardware includes */
 #include "am_mcu_apollo.h"
 #include "am_bsp.h"
+#include "ns_ambiqsuite_harness.h"
 
 /* Scheduler includes. */
 #include "FreeRTOS.h"

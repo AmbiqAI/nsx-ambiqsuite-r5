@@ -4,7 +4,7 @@
 //!
 //! @brief Functions for interfacing with the ambiq card host.
 //!
-//! @addtogroup card Card Functionality for SD/MMC/eMMC/SDIO
+//! @addtogroup card_ap510 Card Functionality for SD/MMC/eMMC/SDIO
 //! @ingroup apollo510_hal
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef AM_HAL_CARD_H
@@ -530,7 +530,7 @@ static inline uint32_t am_hal_unstuff_bits(uint32_t *resp, uint32_t start, uint3
 
 static inline uint32_t am_hal_unstuff_bytes(uint32_t *ext_csd, uint32_t start, uint32_t size)
 {
-    uint32_t i;
+    int i;
     const uint32_t __size = size;
     uint32_t __res = 0x0;
     const uint8_t *__p = (const uint8_t *)ext_csd;

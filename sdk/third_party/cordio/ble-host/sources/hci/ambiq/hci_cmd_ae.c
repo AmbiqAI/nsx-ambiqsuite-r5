@@ -458,9 +458,18 @@ void HciLeExtCreateConnCmd(hciExtInitParam_t *pInitParam, hciExtInitScanParam_t 
     }
   }
 
+#if (BT_54)
+  if ((pBuf = hciCmdAlloc(HCI_OPCODE_LE_EXT_CREATE_CONN_V2, HCI_LEN_LE_EXT_CREATE_CONN_V2(numPhys))) != NULL)
+#else
   if ((pBuf = hciCmdAlloc(HCI_OPCODE_LE_EXT_CREATE_CONN, HCI_LEN_LE_EXT_CREATE_CONN(numPhys))) != NULL)
+#endif // BT_54
   {
     p = pBuf + HCI_CMD_HDR_LEN;
+
+    #if (BT_54)
+    UINT8_TO_BSTREAM(p, pInitParam->advHandle);
+    UINT8_TO_BSTREAM(p, pInitParam->subEvent);
+    #endif // BT_54
     UINT8_TO_BSTREAM(p, pInitParam->filterPolicy);
     UINT8_TO_BSTREAM(p, pInitParam->ownAddrType);
     UINT8_TO_BSTREAM(p, pInitParam->peerAddrType);
@@ -701,3 +710,178 @@ void HciLeWriteRfPathComp(int16_t txPathComp, int16_t rxPathComp)
     hciCmdSend(pBuf);
   }
 }
+
+#if (BT_54)
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE set extended advertising parameters version 2 command.
+ *
+ *  \param      advHandle      Advertising handle.
+ *  \param      pExtAdvParamV2 Extended advertising parameters version 2.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void HciLeSetExtAdvParamCmdV2(uint8_t advHandle, hciExtAdvParamV2_t *pExtAdvParamV2)
+{
+  uint8_t *pBuf;
+  uint8_t *p;
+
+  if ((pBuf = hciCmdAlloc(HCI_OPCODE_LE_SET_EXT_ADV_PARAM_V2, HCI_LEN_LE_SET_EXT_ADV_PARAM_V2)) != NULL)
+  {
+    p = pBuf + HCI_CMD_HDR_LEN;
+    UINT8_TO_BSTREAM(p, advHandle);
+    UINT16_TO_BSTREAM(p, pExtAdvParamV2->advEventProp);
+    UINT24_TO_BSTREAM(p, pExtAdvParamV2->priAdvInterMin);
+    UINT24_TO_BSTREAM(p, pExtAdvParamV2->priAdvInterMax);
+    UINT8_TO_BSTREAM(p, pExtAdvParamV2->priAdvChanMap);
+    UINT8_TO_BSTREAM(p, pExtAdvParamV2->ownAddrType);
+    UINT8_TO_BSTREAM(p, pExtAdvParamV2->peerAddrType);
+    BDA_TO_BSTREAM(p, pExtAdvParamV2->pPeerAddr);
+    UINT8_TO_BSTREAM(p, pExtAdvParamV2->advFiltPolicy);
+    UINT8_TO_BSTREAM(p, pExtAdvParamV2->advTxPwr);
+    UINT8_TO_BSTREAM(p, pExtAdvParamV2->priAdvPhy);
+    UINT8_TO_BSTREAM(p, pExtAdvParamV2->secAdvMaxSkip);
+    UINT8_TO_BSTREAM(p, pExtAdvParamV2->secAdvPhy);
+    UINT8_TO_BSTREAM(p, pExtAdvParamV2->advSID);
+    UINT8_TO_BSTREAM(p, pExtAdvParamV2->scanReqNotifEna);
+    UINT8_TO_BSTREAM(p, pExtAdvParamV2->priAdvPhyOpt);
+    UINT8_TO_BSTREAM(p, pExtAdvParamV2->secAdvPhyOpt);
+    hciCmdSend(pBuf);
+  }
+}
+
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE set periodic advertising parameters version 2 command.
+ *
+ *  \param      advHandle       Advertising handle.
+ *  \param      pPerAdvParamV2  Periodic advertising parameters version 2.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void HciLeSetPerAdvParamCmdV2(uint8_t advHandle, hciPerAdvParamV2_t* pPerAdvParamV2)
+{
+  uint8_t *pBuf;
+  uint8_t *p;
+
+  if ((pBuf = hciCmdAlloc(HCI_OPCODE_LE_SET_PER_ADV_PARAM_V2, HCI_LEN_LE_SET_PER_ADV_PARAM_V2)) != NULL)
+  {
+    p = pBuf + HCI_CMD_HDR_LEN;
+    UINT8_TO_BSTREAM(p, advHandle);
+    UINT16_TO_BSTREAM(p, pPerAdvParamV2->advIntervalMin);
+    UINT16_TO_BSTREAM(p, pPerAdvParamV2->advIntervalMax);
+    UINT16_TO_BSTREAM(p, pPerAdvParamV2->advProps);
+    UINT8_TO_BSTREAM(p, pPerAdvParamV2->numSubEvents);
+    UINT8_TO_BSTREAM(p, pPerAdvParamV2->subEventInterval);
+    UINT8_TO_BSTREAM(p, pPerAdvParamV2->respSlotDelay);
+    UINT8_TO_BSTREAM(p, pPerAdvParamV2->respSlotSpacing);
+    UINT8_TO_BSTREAM(p, pPerAdvParamV2->numRespSlots);
+
+    hciCmdSend(pBuf);
+  }
+}
+
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE set periodic advertising subevent data command.
+ *
+ *  \param      advHandle          Advertising handle.
+ *  \param      numSubEvt          Number of subevent data in the command.
+ *  \param      pPerAdvSbuEvtData  Periodic advertising subevent data structure.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void HciLeSetPerAdvSubEvtDataCmd(uint8_t advHandle, uint8_t numSubEvt, hciPerAdvSubEvtDataSetElem_t* pPerAdvSbuEvtData)
+{
+  uint8_t *pBuf;
+  uint8_t *p;
+  uint8_t cmd_length = 0;
+
+  cmd_length = sizeof(hciPerAdvSubEvtDataSet_t) + numSubEvt * offsetof(hciPerAdvSubEvtDataSetElem_t, subEvtData);
+
+  for (uint8_t i = 0; i < numSubEvt; i++) {
+    cmd_length += pPerAdvSbuEvtData[i].subEvtDataLen;
+  }
+
+  if ((pBuf = hciCmdAlloc(HCI_OPCODE_LE_SET_PER_ADV_SUB_EVT_DATA, cmd_length)) != NULL)
+  {
+    p = pBuf + HCI_CMD_HDR_LEN;
+    UINT8_TO_BSTREAM(p, advHandle);
+    UINT8_TO_BSTREAM(p, numSubEvt);
+
+    for(uint8_t subEvtIdx=0; subEvtIdx<numSubEvt; subEvtIdx++)
+    {
+      UINT8_TO_BSTREAM(p, pPerAdvSbuEvtData[subEvtIdx].subEvt);
+      UINT8_TO_BSTREAM(p, pPerAdvSbuEvtData[subEvtIdx].rspSlotStart);
+      UINT8_TO_BSTREAM(p, pPerAdvSbuEvtData[subEvtIdx].rspSlotCnt);
+      UINT8_TO_BSTREAM(p, pPerAdvSbuEvtData[subEvtIdx].subEvtDataLen);
+      memcpy(p, pPerAdvSbuEvtData[subEvtIdx].subEvtData, pPerAdvSbuEvtData[subEvtIdx].subEvtDataLen);
+      p += pPerAdvSbuEvtData[subEvtIdx].subEvtDataLen;
+    }
+
+    hciCmdSend(pBuf);
+  }
+}
+
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE set periodic advertising response data command.
+ *
+ *  \param      advHandle          Advertising handle.
+ *  \param      pPerAdvRspData     Pointer to hciPerAdvRspData_tstructure.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void HciLeSetPerAdvRspDataCmd(hciPerAdvRspData_t * pPerAdvRspData)
+{
+  uint8_t *pBuf;
+  uint8_t *p;
+
+  if ((pBuf = hciCmdAlloc(HCI_OPCODE_LE_SET_PER_ADV_RSP_DATA, HCI_LE_SET_PER_ADV_RSP_DATA_EVT(pPerAdvRspData->responseDataLen))) != NULL)
+  {
+    p = pBuf + HCI_CMD_HDR_LEN;
+    UINT16_TO_BSTREAM(p, pPerAdvRspData->syncHandle);
+    UINT16_TO_BSTREAM(p, pPerAdvRspData->requestEvent);
+    UINT8_TO_BSTREAM(p, pPerAdvRspData->requestSubEvt);
+    UINT8_TO_BSTREAM(p, pPerAdvRspData->responseSubEvt);
+    UINT8_TO_BSTREAM(p, pPerAdvRspData->responseSlot);
+    UINT8_TO_BSTREAM(p, pPerAdvRspData->responseDataLen);
+
+    memcpy(p, pPerAdvRspData->responseData, pPerAdvRspData->responseDataLen);
+
+    hciCmdSend(pBuf);
+  }
+}
+
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE Set Periodic Sync Subevent command.
+ *
+ *  \param
+ *  \param      pPerSyncSubEvt  pointer to hciPerSyncSubEvtSet_t structure.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void HciLeSetPerSyncSubEvtCmd(hciPerSyncSubEvtSet_t* pPerSyncSubEvt)
+{
+  uint8_t *pBuf;
+  uint8_t *p;
+
+  if ((pBuf = hciCmdAlloc(HCI_OPCODE_LE_SET_PER_SYNC_SUB_EVT, HCI_LE_LE_SET_PER_SYNC_SUB_EVT(pPerSyncSubEvt->numSubEvents))) != NULL)
+  {
+    p = pBuf + HCI_CMD_HDR_LEN;
+    UINT16_TO_BSTREAM(p, pPerSyncSubEvt->syncHandle);
+    UINT16_TO_BSTREAM(p, pPerSyncSubEvt->perAdvProp);
+    UINT8_TO_BSTREAM(p, pPerSyncSubEvt->numSubEvents);
+
+    memcpy(p, pPerSyncSubEvt->subEvents, pPerSyncSubEvt->numSubEvents);
+
+    hciCmdSend(pBuf);
+  }
+}
+#endif // (BT_54)

@@ -169,11 +169,12 @@ void WsfTaskUnlock(void)
 
 void WsfSetOsSpecificEvent(void)
 {
+  HCI_TRACE_INFO0("WsfSetOsSpecificEvent");
   if(xRadioTaskEventObject != NULL) 
   {
 
       BaseType_t xHigherPriorityTaskWoken, xResult;
-
+      HCI_TRACE_INFO0("WsfSetOsSpecificEvent xPortIsInsideInterrupt() == pdTRUE");
       if(xPortIsInsideInterrupt() == pdTRUE) {
 
           //
@@ -195,19 +196,23 @@ void WsfSetOsSpecificEvent(void)
 
       }
       else {
-
+          HCI_TRACE_INFO0("WsfSetOsSpecificEvent xPortIsInsideInterrupt() == pdFALSE");
           xResult = xEventGroupSetBits(xRadioTaskEventObject, 1);
+          HCI_TRACE_INFO1("WsfSetOsSpecificEvent xResult = xEventGroupSetBits(xRadioTaskEventObject, 1) %d", xResult);
           //
           // If the radio task is higher priority than the context we're currently
           // running from, we should yield now and run the radio task.
           //
           if ( xResult != pdFAIL )
           {
+              HCI_TRACE_INFO0("WsfSetOsSpecificEvent portYIELD");
               portYIELD();
+              HCI_TRACE_INFO0("WsfSetOsSpecificEvent portYIELD returned");
           }
       }
 
-  }    
+  }
+  HCI_TRACE_INFO0("WsfSetOsSpecificEvent returned");
 }
 
 /*************************************************************************************************/
@@ -224,20 +229,22 @@ void WsfSetOsSpecificEvent(void)
 /*************************************************************************************************/
 void WsfSetEvent(wsfHandlerId_t handlerId, wsfEventMask_t event)
 {
+  HCI_TRACE_INFO2("WsfSetEvent handlerId:%u event:%u", handlerId, event);
   WSF_CS_INIT(cs);
-
+  HCI_TRACE_INFO0("WsfSetEvent WSF_CS_INIT");
   WSF_ASSERT(WSF_HANDLER_FROM_ID(handlerId) < WSF_MAX_HANDLERS);
-
+  HCI_TRACE_INFO0("WsfSetEvent WSF_ASSERT");
   WSF_TRACE_INFO2("WsfSetEvent handlerId:%u event:%u", handlerId, event);
-
+  HCI_TRACE_INFO0("WsfSetEvent WSF_CS_ENTER");
   WSF_CS_ENTER(cs);
   wsfOs.task.handlerEventMask[WSF_HANDLER_FROM_ID(handlerId)] |= event;
   wsfOs.task.taskEventMask |= WSF_HANDLER_EVENT;
   WSF_CS_EXIT(cs);
-
+  HCI_TRACE_INFO0("WsfSetEvent WSF_CS_EXIT");
   /* set event in OS */
 
   WsfSetOsSpecificEvent();
+  HCI_TRACE_INFO0("WsfSetEvent WsfSetOsSpecificEvent");
 }
 
 /*************************************************************************************************/
@@ -414,8 +421,11 @@ void wsfOsDispatcher(void)
           eventMask = pTask->handlerEventMask[i];
           pTask->handlerEventMask[i] = 0;
           WSF_CS_EXIT(cs);
+          HCI_TRACE_INFO1("WsfOsDispatcher handlerEventMask[i] 0x%x", eventMask);
+          HCI_TRACE_INFO1("WsfOsDispatcher *pTask->handler[i] 0x%x", *pTask->handler[i]);
 
           (*pTask->handler[i])(eventMask, NULL);
+          HCI_TRACE_INFO0("WsfOsDispatcher handler[i] returned");
         }
       }
     }

@@ -7,13 +7,13 @@
  *  Copyright (c) 2016-2019 Arm Ltd. All Rights Reserved.
  *
  *  Copyright (c) 2019-2020 Packetcraft, Inc.
- *  
+ *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
- *  
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- *  
+ *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -199,6 +199,9 @@ extern "C" {
 #define DM_ADV_TYPE_MESH_BEACON     0x2B  /*!< \brief Mesh beacon*/
 #define DM_ADV_TYPE_BIG_INFO        0x2C  /*!< \brief BIG Info */
 #define DM_ADV_TYPE_BCAST_CODE      0x2D  /*!< \brief Mesh beacon */
+#if (BT_54)
+#define DM_ADV_TYPE_ENCRYPTED_DATA  0x31  /*!< \brief Encrypted data */
+#endif // BT_54
 #define DM_ADV_TYPE_3D_INFO_DATA    0x3D  /*!< \brief 3D information data */
 #define DM_ADV_TYPE_MANUFACTURER    0xFF  /*!< \brief Manufacturer specific data */
 /**@}*/
@@ -473,6 +476,22 @@ enum
 #define DM_ADV_HANDLE_DEFAULT       0
 /**@}*/
 
+#if (BT_54)
+/** \name DM Encrypted Advertising Data sizes
+ * Sizes of Encrypted Advertising Data.
+ */
+/**@{*/
+#define DM_EAD_RANDOMIZER_SIZE      5                  /*!< \brief Randomizer size in bytes */
+#define DM_EAD_KEY_SIZE	            SEC_CCM_KEY_LEN    /*!< \brief Key size in bytes */
+#define DM_EAD_IV_SIZE	            8                  /*!< \brief Initialisation Vector size in bytes */
+#define DM_EAD_MIC_SIZE	            4                  /*!< \brief MIC size in bytes */
+#define DM_EAD_NONCE_SIZE           SEC_CCM_NONCE_LEN  /*!< \brief Nonce size in bytes */
+#define DM_EAD_RANDOMIZER_DIR_BIT   7                  /*!< \brief DirectionBit of the CCM nonce to the MSB of the Randomizer */
+#define DM_EAD_AAD_VALUE            0xEA               /*!< \brief Fixed value used for the Additional Authenticated Data */
+#define DM_EAD_AAD_SIZE             1                  /*!< \brief Additional Authenticated Data size in bytes */
+/**@}*/
+#endif // BT_54
+
 /** \name DM Callback Events
  * Events handled by the DM state machine.
  */
@@ -573,10 +592,23 @@ enum
   DM_ERROR_IND,                           /*!< \brief General error */
   DM_HW_ERROR_IND,                        /*!< \brief Hardware error */
   DM_VENDOR_SPEC_IND,                     /*!< \brief Vendor specific event */
-  DM_VENDOR_SPEC_CMD_CMPL_IND            /*!< \brief Vendor specific command complete event */
+  DM_VENDOR_SPEC_CMD_CMPL_IND,            /*!< \brief Vendor specific command complete event */
+#if (BT_53)
+  DM_CONN_SUBRATE_CHANGE_IND,             /*!< \brief LE Connection Subrate changed */
+#endif // BT_53
+#if (BT_54)
+  DM_EAD_ENC_CMPL_IND,                    /*!< \brief Encrypted advertising data encryption complete event */
+  DM_EAD_DEC_CMPL_IND,                    /*!< \brief Encrypted advertising data decryption complete event */
+#endif // BT_54
+#if (BT_54)
+  DM_PER_ADV_SUBEVT_DATA_REQ_IND,       /*!< \brief LE Periodic Advertising Subevent Data Request event */
+  DM_PER_ADV_RSP_REPORT_IND,            /*!< \brief LE Periodic Advertising Response Report event */
+#endif // BT_54
+
+  DM_END_IND                              /*!< \brief Ending value of DM indication event */
 };
 
-#define DM_CBACK_END                DM_VENDOR_SPEC_CMD_CMPL_IND  /*!< \brief DM callback event ending value */
+#define DM_CBACK_END                (DM_END_IND - 1)  /*!< \brief DM callback event ending value */
 /**@}*/
 
 /**************************************************************************************************
@@ -616,6 +648,15 @@ typedef struct
 {
   uint8_t                   key[SMP_KEY_LEN];   /*!< \brief CSRK */
 } dmSecCsrk_t;
+
+#if (BT_54)
+/*! \brief Encrypted Data Key Material data type. */
+typedef struct
+{
+  uint8_t                   key[DM_EAD_KEY_SIZE];   /*!< \brief session key */
+  uint8_t                   iv[DM_EAD_IV_SIZE];     /*!< \brief IV */
+} dmSecEdkm_t;
+#endif // BT_54
 
 /*! \brief Union of key types. */
 typedef union
@@ -850,7 +891,19 @@ typedef union
   /* common header used by                                                            DM_ERROR_IND */
   hciHwErrorEvt_t                     hwError;               /*!< \brief handles \ref DM_HW_ERROR_IND */
   hciVendorSpecEvt_t                  vendorSpec;            /*!< \brief handles \ref DM_VENDOR_SPEC_IND */
-  hciVendorSpecCmdCmplEvt_t           vendorSpecCmdCmpl; 	 /*!< \brief handles \ref DM_VENDOR_SPEC_CMD_CMPL_IND */
+  hciVendorSpecCmdCmplEvt_t           vendorSpecCmdCmpl; 	   /*!< \brief handles \ref DM_VENDOR_SPEC_CMD_CMPL_IND */
+#if (BT_53)
+  hciLeSubrateChangeEvt_t             subrateChange;         /*!< \brief handles \ref DM_CONN_SUBRATE_CHANGE_IND */
+#endif // BT_53
+#if (BT_54)
+  secCcmEncMsg_t                      ccmEnc;                /*!< \brief handles \ref DM_EAD_ENC_CMPL_IND */
+  secCcmDecMsg_t                      ccmDec;                /*!< \brief handles \ref DM_EAD_DEC_CMPL_IND */
+#endif // BT_54
+#if (BT_54)
+  hciLePerAdvSubevtDataReqEvt_t       perAdvDataReq;         /*!< \brief handles \ref DM_PER_ADV_SUBEVT_DATA_REQ_IND */
+  hciLePerAdvRspReportEvt_t           perAdvRspReport;
+#endif // BT_54
+
 } dmEvt_t;
 
 /*! \brief Data type for DmSecSetOob(). */
@@ -1301,6 +1354,22 @@ void DmPerAdvSetInterval(uint8_t advHandle, uint16_t intervalMin, uint16_t inter
 /*************************************************************************************************/
 void DmPerAdvIncTxPwr(uint8_t advHandle, bool_t incTxPwr);
 
+#if (BT_53)
+/*************************************************************************************************/
+/*!
+ *  \brief  Set whether or not to include ADI(Adverting Data Info) in extended header of
+ *          advertising PDU for periodic advertising.
+ *
+ *  \param  advHandle    Advertising handle.
+ *  \param  incAdi     Whether to include ADI in extended header of advertising PDU (default
+ *                       value is FALSE).
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmPerAdvIncAdi(uint8_t advHandle, bool_t incAdi);
+#endif // BT_53
+
 /*************************************************************************************************/
 /*!
  *  \brief  Get status of periodic advertising handle.
@@ -1718,6 +1787,48 @@ bool_t DmSyncEnabled(uint16_t syncHandle);
 /*************************************************************************************************/
 void DmSyncInitialRptEnable(bool_t enable);
 
+#if (BT_53)
+/*************************************************************************************************/
+/*!
+ *  \brief  DM enable or disable initial periodic advertising duplicate filtering once synchronized.
+ *
+ *  \param  enable   TRUE to enable initial duplicate filtering, FALSE to disable duplicate filtering.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmSyncInitialDupFiltEnable(bool_t enable);
+
+/*************************************************************************************************/
+/*!
+ *  \brief  DM enable or disable periodic advertising duplicate filtering
+ *
+ *  \param  enable   TRUE to enable duplicate filtering, FALSE to disable duplicate filtering.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmPastDupFiltEnable(bool_t enable);
+#endif // BT_53
+
+#if (BT_54)
+/*************************************************************************************************/
+/*!
+ *  \brief  DM set periodic sync subtevent.
+ *
+ *  \param  syncHandle      Identifying the PAwR train.
+ *  \param  perAdvProp      Periodic advertising properties.
+ *  \param  numSubEvents    Number of subevents.
+ *  \param  subEvents       The subevent to synchronize with.
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmSyncSetSubEvt(uint16_t syncHandle, uint16_t perAdvProp, uint8_t numSubEvents, uint8_t * subEvents);
+
+void DmConnSetConnParam(uint8_t advHandle, uint8_t subEvent);
+
+#endif // BT_54
+
 /*************************************************************************************************/
 /*!
  *  \brief  Synchronize to a Broadcast Isochronous Group (BIG) described in the periodic
@@ -1740,7 +1851,7 @@ void DmBigSyncStart(uint8_t bigHandle, uint16_t syncHandle, uint8_t mse, uint16_
 /*!
  *  \brief  Stop synchronizing or cancel the process of synchronizing to the Broadcast Isochronous
  *           Group (BIG) identified by the handle.
- * 
+ *
  *  \note   The command also terminates the reception of BISes in the BIG specified in \ref
  *          DmBigSyncStart, destroys the associated connection handles of the BISes in the BIG
  *          and removes the data paths for all BISes in the BIG.
@@ -2434,7 +2545,7 @@ void DmCisCigSetTransLatInterval(uint8_t cigId, uint16_t transLatMToS, uint16_t 
 
 /*************************************************************************************************/
 /*!
- *  \brief  Set the parameters of one or more Connected Isochronous Streams (CISes) that are 
+ *  \brief  Set the parameters of one or more Connected Isochronous Streams (CISes) that are
  *          associated with the given Connected Isochronous Group (CIG).
  *
  *  \param  cigId       CIG identifier.
@@ -2448,7 +2559,7 @@ void DmCisCigConfig(uint8_t cigId, dmConnId_t numCis, HciCisCisParams_t *pCisPar
 
 /*************************************************************************************************/
 /*!
- *  \brief  Remove all the Connected Isochronous Streams (CISes) associated with the given 
+ *  \brief  Remove all the Connected Isochronous Streams (CISes) associated with the given
  *          Connected Isochronous Group (CIG).
  *
  *  \param  cigId       CIG identifier.
@@ -2460,7 +2571,7 @@ void DmCisCigRemove(uint8_t cigId);
 
 /*************************************************************************************************/
 /*!
- *  \brief  Create one or more Connected Isochronous Streams (CISes) using the connections 
+ *  \brief  Create one or more Connected Isochronous Streams (CISes) using the connections
  *          identified by the ACL connection handles.
  *
  *  \param  numCis      Total number of CISes to be created.
@@ -2539,7 +2650,7 @@ void DmBisSlaveInit(void);
 
 /*************************************************************************************************/
 /*!
- *  \brief  Start a Broadcast Isochronous Group (BIG) with one or more Broadcast Isochronous 
+ *  \brief  Start a Broadcast Isochronous Group (BIG) with one or more Broadcast Isochronous
  *          Streams (BISes).
  *
  *  \param  bigHandle     CIG identifier.
@@ -3364,6 +3475,124 @@ void DmReadRemoteFeatures(dmConnId_t connId);
  */
 /*************************************************************************************************/
 void DmReadRemoteVerInfo(dmConnId_t connId);
+
+#if (BT_53)
+/*************************************************************************************************/
+/*!
+ *  \brief  Set the default LE subrating parameters of an open connection
+ *
+ *  \param  connId         Connection identifier.
+ *  \param  pSubrateParam  LE subrating parameters.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmConnSetDefaultSubrate(dmConnId_t connId, hciLeSetDefaultSubrate_t *pSubrateParam);
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Request LE Subrating of an open connection
+ *
+ *  \param  connId         Connection identifier.
+ *  \param  pSubrateParam  LE subrating parameters.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmConnSubrateReq(dmConnId_t connId, hciLeSubrateReq_t *pSubrateParam);
+
+#endif // BT_53
+
+#if (BT_54)
+/*************************************************************************************************/
+/*!
+ *  \brief  Set extended advertising PHY version 2 parameters.
+ *
+ *  \param  advHandle     Advertising handle.
+ *  \param  priAdvPhy     Primary advertising Phy.
+ *  \param  secAdvMaxSkip Maximum advertising events Controller can skip before sending AUX_ADV_IND
+ *                        on secondary advertising channel (0 = AUX_ADV_IND will be sent prior to
+ *                        next advertising event).
+ *  \param  secAdvPhy     Secondary advertising Phy.
+ *  \param  priAdvPhyOpt  Primary advertising Phy Options.
+ *  \param  secAdvPhyOpt  Secondary advertising Phy Options.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmAdvSetPhyParamV2(uint8_t advHandle, uint8_t priAdvPhy, uint8_t secAdvMaxSkip, uint8_t secAdvPhy,
+                        uint8_t priAdvPhyOpt, uint8_t secAdvPhyOpt);
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Initialize DM encrypted advertising data module.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmEadInit(void);
+
+/*************************************************************************************************/
+/*!
+  *  \brief  Execute the CCM encryption by advertiser for advertising data.
+  *
+  *  \param  sessionKey   Pointer to session key.
+  *  \param  iv           Pointer to initialization vector.
+  *  \param  len          Length of plain payload (Input data) in bytes.
+  *  \param  pDataIn      Pointer to plain payload (Input data).
+  *  \param  pDataOut     Pointer to encrypted payload (Output data).
+  *
+  *  \return None.
+  */
+/*************************************************************************************************/
+void DmEadEncrypt(uint8_t *sessionKey, uint8_t *iv, uint16_t len, uint8_t *pDataIn, uint8_t *pDataOut);
+
+/*************************************************************************************************/
+/*!
+  *  \brief  Execute the CCM decryption by scanner for encrypted advertising data.
+  *
+  *  \param  sessionKey   Pointer to session key.
+  *  \param  iv           Pointer to initialization vector.
+  *  \param  len          Length of encrypted payload (Input data) in bytes.
+  *  \param  pDataIn      Pointer to encrypted payload (Input data).
+  *  \param  pDataOut     Pointer to decrypted payload (Output data).
+  *
+  *  \return None.
+  */
+/*************************************************************************************************/
+void DmEadDecrypt(uint8_t *sessionKey, uint8_t *iv, uint16_t len, uint8_t *pDataIn, uint8_t *pDataOut);
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Set periodic advertising parameter subevent related settings.
+ *
+ *  \param  advHandle       Advertising handle.
+ *  \param  numSubEvt       Number of subevent.
+ *  \param  subEvtInt       Interval between subevents.
+ *  \param  rspSlotDelay    Time between the advertising packet in a subevent and the first
+                            response slot.
+ *  \param  rspSlotSpacing  Time between response slots.
+ *  \param  numRspSlots     Number of subevent response slots.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmAdvSetPerSbuEvtParam(uint8_t advHandle, uint8_t numSubEvt, uint8_t subEvtInt,
+                            uint8_t rspSlotDelay, uint8_t rspSlotSpacing, uint8_t numRspSlots);
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Set periodic advertising subevent data
+ *
+ *  \param  advHandle           Advertising handle.
+ *  \param  numSubevt           Number of subevent data
+ *  \param  subEvtData          Pointer to hciPerAdvSubEvtDataSetElem_t structure.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmAdvSetPerAdvSbuEvtData(uint8_t advHandle, uint8_t numSubevt, hciPerAdvSubEvtDataSetElem_t *subEvtData);
+#endif // BT_54
 
 /**@}*/
 

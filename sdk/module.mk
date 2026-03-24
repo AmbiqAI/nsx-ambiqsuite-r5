@@ -1,5 +1,5 @@
 local_src := $(wildcard $(subdirectory)/src/*.c)
-local_src += $(wildcard $(subdirectory)/src/$(PART)/*.c)
+local_src += $(wildcard $(subdirectory)/src/apollo510/*.c)
 local_src += $(wildcard $(subdirectory)/src/*.cc)
 local_src += $(wildcard $(subdirectory)/src/*.s)
 ifeq ($(USB_PRESENT),1)
@@ -21,9 +21,9 @@ includes_api += $(subdirectory)/src
 # includes_api += $(subdirectory)/CMSIS/ARM/Include
 includes_api += $(subdirectory)/CMSIS/AmbiqMicro/Include
 includes_api += $(subdirectory)/devices
-includes_api += $(subdirectory)/mcu/$(BOARDROOT)
-includes_api += $(subdirectory)/mcu/$(BOARDROOT)/hal
-includes_api += $(subdirectory)/mcu/$(BOARDROOT)/hal/mcu
+includes_api += $(subdirectory)/mcu/apollo510
+includes_api += $(subdirectory)/mcu/apollo510/hal
+includes_api += $(subdirectory)/mcu/apollo510/hal/mcu
 includes_api += $(subdirectory)/utils
 
 ifeq ($(TOOLCHAIN),arm)

@@ -2,9 +2,9 @@
 //
 //! @file am_util_bootloader.h
 //!
-//! @brief Bootloader Utility
+//! @brief Bootloader Utility Functions
 //!
-//! @addtogroup bootl Bootloader Utility
+//! @addtogroup bootl_utils Bootloader Utility
 //! @ingroup utils
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #include <stdint.h>

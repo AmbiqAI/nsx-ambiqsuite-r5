@@ -2,11 +2,48 @@
 //
 //! @file am_devices_mspi_psram_aps25616n.c
 //!
-//! @brief APM DDR HEX and Octal SPI PSRAM driver.
+//! @brief Multi-bit SPI PSRAM driver for the APS25616N device.
 //!
-//! @addtogroup mspi_psram_aps25616n APS25616N MSPI PSRAM 1.8V Driver
+//! @addtogroup devices_mspi_psram_aps25616n APS25616N MSPI PSRAM Driver
 //! @ingroup devices
 //! @{
+//!
+//! Purpose: This module provides a hardware abstraction layer
+//!          for the APS25616N Multi-bit SPI PSRAM device. It enables high-speed
+//!          read/write operations, DDR mode support, and XIP functionality for
+//!          embedded applications requiring external volatile memory. The driver
+//!          supports efficient data access, timing optimization, and system
+//!          integration for optimal PSRAM performance.
+//!
+//! @section devices_mspi_psram_aps25616n_features Key Features
+//!
+//! 1. @b High-speed @b Access: Multi-bit SPI for fast read/write operations.
+//! 2. @b DDR @b Support: Double Data Rate for maximum throughput.
+//! 3. @b XIP @b Mode: Execute code directly from PSRAM.
+//! 4. @b DMA @b Support: Efficient data transfer operations.
+//! 5. @b Power @b Management: Low-power modes and fast wake-up.
+//!
+//! @section devices_mspi_psram_aps25616n_functionality Functionality
+//!
+//! - Initialize and configure APS25616N device
+//! - Perform read/write operations with DMA support
+//! - Handle DDR mode configuration
+//! - Manage XIP mode settings
+//! - Control power states
+//!
+//! @section devices_mspi_psram_aps25616n_usage Usage
+//!
+//! 1. Initialize device with am_devices_mspi_psram_aps25616n_init()
+//! 2. Read/write data using blocking or non-blocking APIs
+//! 3. Enable XIP mode for code execution
+//! 4. Configure DDR mode as needed
+//!
+//! @section devices_mspi_psram_aps25616n_configuration Configuration
+//!
+//! - Set up MSPI interface and timing parameters
+//! - Configure DMA for data transfers
+//! - Enable DDR mode features
+//! - Optimize power management settings
 //
 //*****************************************************************************
 
@@ -44,7 +81,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -64,11 +101,7 @@
 
 //#define USE_NON_DQS_MODE
 
-#if defined(USE_NEW_DDR)
-#define MSPI_BASE_FREQUENCY AM_HAL_MSPI_CLK_96MHZ
-#else
 #define MSPI_BASE_FREQUENCY AM_HAL_MSPI_CLK_48MHZ
-#endif
 
 #define APS25616N_tHS_MIN_US        5   // with margin
 #define APS25616N_tXHS_MIN_US       155 // with margin
@@ -277,11 +310,6 @@ am_hal_mspi_dev_config_t  APMDDROctalCE0MSPIConfig =
   .bEnWriteLatency      = true,
   .bEmulateDDR          = true,
 #if defined(AM_PART_APOLLO5_API)
-#if defined(USE_NEW_DDR)
-  .bNewDDR              = true,
-#else
-  .bNewDDR              = false,
-#endif
   .eCeLatency           = AM_HAL_MSPI_CE_LATENCY_NORMAL,
 #endif
   .ui16DMATimeLimit     = 20,
@@ -314,11 +342,6 @@ am_hal_mspi_dev_config_t  APMDDROctalCE1MSPIConfig =
   .bEnWriteLatency      = true,
   .bEmulateDDR          = true,
 #if defined(AM_PART_APOLLO5_API)
-#if defined(USE_NEW_DDR)
-  .bNewDDR              = true,
-#else
-  .bNewDDR              = false,
-#endif
   .eCeLatency           = AM_HAL_MSPI_CE_LATENCY_NORMAL,
 #endif
   .ui16DMATimeLimit     = 20,
@@ -351,11 +374,6 @@ am_hal_mspi_dev_config_t  APMDDRHEXCE0MSPIConfig =
   .bEnWriteLatency      = true,
   .bEmulateDDR          = true,
 #if defined(AM_PART_APOLLO5_API)
-#if defined(USE_NEW_DDR)
-  .bNewDDR              = true,
-#else
-  .bNewDDR              = false,
-#endif
   .eCeLatency           = AM_HAL_MSPI_CE_LATENCY_NORMAL,
 #endif
   .ui16DMATimeLimit     = 20,
@@ -388,11 +406,6 @@ am_hal_mspi_dev_config_t  APMDDRHEXCE1MSPIConfig =
   .bEnWriteLatency      = true,
   .bEmulateDDR          = true,
 #if defined(AM_PART_APOLLO5_API)
-#if defined(USE_NEW_DDR)
-  .bNewDDR              = true,
-#else
-  .bNewDDR              = false,
-#endif
   .eCeLatency           = AM_HAL_MSPI_CE_LATENCY_NORMAL,
 #endif
   .ui16DMATimeLimit     = 20,
@@ -1272,6 +1285,10 @@ am_devices_mspi_psram_aps25616n_ddr_init(uint32_t ui32Module,
             return AM_DEVICES_MSPI_PSRAM_STATUS_ERROR;
         }
     }
+
+#if defined(AM_PART_APOLLO330P_510L)
+    mspiMemDevCfg->eCeLatency = 1;
+#endif
 
     //
     // Disable MSPI defore re-configuring it
@@ -2422,7 +2439,7 @@ find_mid_point(uint32_t* pVal)
 //*****************************************************************************
 #if defined(AM_PART_APOLLO5_API)
 #define PSRAM_TIMING_SCAN_SIZE_BYTES (4*AM_DEVICES_MSPI_PSRAM_PAGE_SIZE)
-#if defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO330P_510L)
 #define SCAN_TXDQSDELAY_START_INDEX 0
 #define SCAN_TXDQSDELAY_END_INDEX   10
 #else

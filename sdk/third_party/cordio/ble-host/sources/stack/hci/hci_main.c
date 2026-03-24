@@ -27,6 +27,7 @@
 
 #include "wsf_types.h"
 #include "wsf_msg.h"
+#include "wsf_trace.h"
 #include "hci_api.h"
 #include "hci_main.h"
 
@@ -110,12 +111,13 @@ void HciHandlerInit(wsfHandlerId_t handlerId)
 {
   /* store handler ID */
   hciCb.handlerId = handlerId;
-
+  HCI_TRACE_INFO1("HciHandlerInit handlerId 0x%x", handlerId);
   /* init rx queue */
   WSF_QUEUE_INIT(&hciCb.rxQueue);
 
   /* perform other hci initialization */
   HciCoreInit();
+  HCI_TRACE_INFO0("HciHandlerInit returned");
 }
 
 /*************************************************************************************************/
@@ -130,5 +132,6 @@ void HciHandlerInit(wsfHandlerId_t handlerId)
 /*************************************************************************************************/
 void HciHandler(wsfEventMask_t event, wsfMsgHdr_t *pMsg)
 {
+  HCI_TRACE_INFO2("HciHandler event 0x%x pMsg 0x%x", event, pMsg);
   HciCoreHandler(event, pMsg);
 }

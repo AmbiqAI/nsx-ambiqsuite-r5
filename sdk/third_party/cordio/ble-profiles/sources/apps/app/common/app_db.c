@@ -49,6 +49,10 @@ typedef struct
   bool_t       valid;                         /*! TRUE if record is valid */
   bool_t       peerAddedToRl;                 /*! TRUE if peer device's been added to resolving list */
   bool_t       peerRpao;                      /*! TRUE if RPA Only attribute's present on peer device */
+#if (BT_54)
+  bool_t       edkmValid;                     /*! TRUE if Encrypted Data Key Material is valid */
+  dmSecEdkm_t  edkm;                          /*! Encrypted Data Key Material */
+#endif // BT_54
 
   /*! For slave local device */
   dmSecLtk_t   localLtk;                      /*! Local LTK */
@@ -104,16 +108,20 @@ static appDbRec_t *pAppDbNewRec = appDb.rec;
 //
 #ifdef AM_VOS_SDK
 #if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4P)  || defined(AM_PART_APOLLO4L) ||    \
-    defined(AM_PART_APOLLO510)
+    defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510L)
 appDbRec_t * pRecListNvmPointer = (appDbRec_t *)0x000FE000;
 #endif
 #else
 
 #if defined(AM_PART_APOLLO510)
 appDbRec_t * pRecListNvmPointer = (appDbRec_t *)0x00600000; //temporarily put the data here
+#elif defined(AM_PART_APOLLO510L)
+// The BLE firmware locates from MRAM 0x005B8000, temporarily reserve 2KB for BLE data base
+// before the BLE firmware.
+appDbRec_t * pRecListNvmPointer = (appDbRec_t *)0x005B7800;
 #else
 appDbRec_t * pRecListNvmPointer = (appDbRec_t *)0x00070000; //temporarily put the data here
-#endif // #if defined(AM_PART_APOLLO510)
+#endif // #if defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510L)
 
 #endif // AM_VOS_SDK
 
@@ -138,7 +146,7 @@ void AppLoadResList(void)
 void AppCopyRecListInNvm(appDbRec_t *pRecord)
 {
 #if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+    defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510L)
     uint32_t* uint32RecListPointer =  (uint32_t *)pRecListNvmPointer;
 #else
     appDbRec_t* pNvmRec =  pRecListNvmPointer;
@@ -147,7 +155,7 @@ void AppCopyRecListInNvm(appDbRec_t *pRecord)
     for(i=0;i<APP_DB_NUM_RECS;i++)
     {
     #if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-        defined(AM_PART_APOLLO510)
+        defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510L)
         appDbRec_t* pNvmRec = (appDbRec_t*)uint32RecListPointer;
     #endif
 
@@ -156,12 +164,12 @@ void AppCopyRecListInNvm(appDbRec_t *pRecord)
              (*(uint32_t*)pPeerAddr != 0x00000000) )
         {
             //valid record in NVM
-            memcpy((uint8_t *)pRecord, (uint8_t *)pNvmRec, sizeof(appDbRec_t));
+            memcpy(pRecord, pNvmRec, sizeof(appDbRec_t));
 
             //pRecord->inUse = FALSE;
             //pRecord->valid = TRUE;
 #if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+    defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510L)
             uint32RecListPointer += NVM_REC_WORD_LEN;
 #else
             pNvmRec++;
@@ -175,7 +183,8 @@ void AppCopyRecListInNvm(appDbRec_t *pRecord)
     }
 }
 #if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+    defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510L)
+
 // sizeof(appDbRec_t) = 176 bytes of buffer
 uint8_t ui8DbRamBuffer[APP_DB_NUM_RECS * NVM_REC_BYTE_LEN];
 uint16_t ui16DbRamBufferSize = APP_DB_NUM_RECS * NVM_REC_BYTE_LEN;
@@ -194,7 +203,7 @@ static void updateRecordInNVM(uint32_t* pDest, uint32_t* pSrc, uint32_t* pFlashA
 
     uint32_t ui32Critical = am_hal_interrupt_master_disable();
 #if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||   \
-    defined(AM_PART_APOLLO510)
+    defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510L)
     am_hal_mram_main_program(AM_HAL_MRAM_PROGRAM_KEY,
                               (uint32_t *)ui8DbRamBuffer,
                               (uint32_t *)pFlashAddr,
@@ -218,7 +227,7 @@ static void updateRecordInNVM(uint32_t* pDest, uint32_t* pSrc, uint32_t* pFlashA
 int32_t AppDbUpdateNVM(appDbHdl_t hdl)
 {
 #if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+    defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510L)
     uint32_t* pNvmRec =  (uint32_t *)pRecListNvmPointer;
     uint8_t * pRamBufRec = ui8DbRamBuffer;
 #else
@@ -238,7 +247,7 @@ int32_t AppDbUpdateNVM(appDbHdl_t hdl)
             if(BdaCmp(((appDbRec_t*)hdl)->peerAddr, ((appDbRec_t* )pNvmRec)->peerAddr))
             {
 #if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+    defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510L)
                 updateRecordInNVM((uint32_t*)&pRamBufRec[i*NVM_REC_BYTE_LEN], (uint32_t*)((appDbRec_t*)hdl)->peerAddr, (uint32_t*)pRecListNvmPointer);
 #else
                 updateRecordInNVM((uint32_t*)&pRamBufRec[i], (uint32_t*)((appDbRec_t*)hdl)->peerAddr, (uint32_t*)pRecListNvmPointer);
@@ -248,7 +257,7 @@ int32_t AppDbUpdateNVM(appDbHdl_t hdl)
 
             //skip
 #if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+    defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510L)
             pNvmRec += NVM_REC_WORD_LEN;
 #else
             pNvmRec++;
@@ -258,7 +267,7 @@ int32_t AppDbUpdateNVM(appDbHdl_t hdl)
         {
             uint32_t ui32Critical = am_hal_interrupt_master_disable();
 #if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+    defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510L)
             am_hal_mram_main_program(AM_HAL_MRAM_PROGRAM_KEY,
                                       (uint32_t *)((appDbRec_t*)hdl)->peerAddr,
                                       (uint32_t *)pNvmRec,
@@ -280,7 +289,7 @@ int32_t AppDbUpdateNVM(appDbHdl_t hdl)
     // erase the page
     uint32_t ui32Critical = am_hal_interrupt_master_disable();
 #if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+    defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510L)
     am_hal_mram_main_program(AM_HAL_MRAM_PROGRAM_KEY,
                               (uint32_t *)((appDbRec_t*)hdl)->peerAddr,
                               (uint32_t *)pRecListNvmPointer,
@@ -1119,3 +1128,79 @@ void AppDbSetPeerRpao(appDbHdl_t hdl, bool_t peerRpao)
   AppDbUpdateNVM(hdl);
 #endif
 }
+
+#if (BT_54)
+/*************************************************************************************************/
+/*!
+ *  \brief  Get the Encrypted Data Key Material for a given peer device.
+ *
+ *  \param  hdl         Database record handle.
+ *
+ *  \return sessionKey  The shared sessionKey.
+ *  \return iv          The initialization vector.
+ */
+/*************************************************************************************************/
+void AppDbGetPeerEdkm(appDbHdl_t hdl, uint8_t *sessionKey, uint8_t *iv)
+{
+  if ((sessionKey != NULL) && (iv != NULL) && (AppDbGetPeerEdkmValid(hdl)))
+  {
+    memcpy(sessionKey, ((appDbRec_t *)hdl)->edkm.key, DM_EAD_KEY_SIZE);
+    memcpy(iv, ((appDbRec_t *)hdl)->edkm.iv, DM_EAD_IV_SIZE);
+  }
+}
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Set the Encrypted Data Key Material for a given peer device.
+ *
+ *  \param  hdl         Database record handle.
+ *  \param  sessionKey  The shared sessionKey.
+ *  \param  iv          The initialization vector.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void AppDbSetPeerEdkm(appDbHdl_t hdl, uint8_t *sessionKey, uint8_t *iv)
+{
+  if ((sessionKey != NULL) && (iv != NULL))
+  {
+    memcpy(((appDbRec_t *)hdl)->edkm.key, sessionKey, DM_EAD_KEY_SIZE);
+    memcpy(((appDbRec_t *)hdl)->edkm.iv, iv, DM_EAD_IV_SIZE);
+    AppDbSetPeerEdkmValid(hdl, TRUE);
+
+#ifdef AM_BLE_USE_NVM
+    AppDbUpdateNVM(hdl);
+#endif
+  }
+}
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Get the Encrypted Data Key Material valid flag.
+ *
+ *  \param  hdl  Database record handle.
+ *
+ *  \return TRUE if Encrypted data key material record is valid. FALSE, otherwise.
+ */
+/*************************************************************************************************/
+bool_t AppDbGetPeerEdkmValid(appDbHdl_t hdl)
+{
+  return ((appDbRec_t *)hdl)->edkmValid;
+}
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Set the Encrypted Data Key Material valid flag.
+ *
+ *  \param  hdl    Database record handle.
+ *  \param  valid  Set the Encrypted data key material record valid flag.
+ *
+ *  \return none.
+ */
+/*************************************************************************************************/
+void AppDbSetPeerEdkmValid(appDbHdl_t hdl, bool_t valid)
+{
+  ((appDbRec_t *)hdl)->edkmValid = valid;
+}
+
+#endif // BT_54

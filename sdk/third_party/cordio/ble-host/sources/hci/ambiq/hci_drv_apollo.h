@@ -39,7 +39,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef HCI_DRV_APOLLO_H
@@ -86,7 +86,7 @@ extern void HciDrvUartUnpause(void);
 extern bool HciDrvUartSafeShutdown(void);
 
 #if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P)  ||   \
-    defined(AM_PART_APOLLO510)
+    defined(AM_PART_APOLLO510) || defined(AM_PART_APOLLO510L)
 extern uint32_t HciDrvRadioBoot(bool bColdBoot);
 #else
 #if defined(AM_PART_APOLLO3) || defined(AM_PART_APOLLO3P)

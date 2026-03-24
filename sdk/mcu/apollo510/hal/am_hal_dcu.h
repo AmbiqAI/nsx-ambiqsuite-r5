@@ -4,7 +4,7 @@
 //!
 //! @brief Functions for DCU functions
 //!
-//! @addtogroup dcu DCU - Debug Control Unit
+//! @addtogroup dcu_ap510 DCU - Debug Control Unit
 //! @ingroup apollo510_hal
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -56,7 +56,7 @@ extern "C"
 {
 #endif
 
-#define AM_HAL_DCU_NUMDCU               21 // Number of valid bits
+#define AM_HAL_DCU_NUMDCU                   21      //!< Number of valid bits
 
 // Qualified DCU Controls
 #define AM_HAL_DCU_CPUDBG_INVASIVE          0x00000002UL

@@ -40,7 +40,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef HCI_DRV_EM9305_H
@@ -155,16 +155,29 @@ typedef struct{
                              | HCI_LE_SUP_FEAT_SCA_UPDATE \
                              | HCI_LE_SUP_FEAT_REMOTE_PUB_KEY_VALIDATION)
 
-#define LL_FEATURES_BYTE4  (HCI_LE_SUP_FEAT_POWER_CONTROL_REQUEST \
-                             | HCI_LE_SUP_FEAT_POWER_CHANGE_IND \
-                             | HCI_LE_SUP_FEAT_PATH_LOSS_MONITOR \
+#if (BT_53)
+#define LL_FEATURES_BYTE4  (HCI_LE_SUP_FEAT_PATH_LOSS_MONITOR \
+                             | HCI_LE_SUP_FEAT_PRR_ADV_ADI\
+                             | HCI_LE_SUP_FEAT_SUBRATING \
+                             | HCI_LE_SUP_FEAT_SUBRATING_HOST_SUPPORT \
+                             | HCI_LE_SUP_FEAT_CHAN_CLASSIFICATION)
+#else
+#define LL_FEATURES_BYTE4  (HCI_LE_SUP_FEAT_PATH_LOSS_MONITOR \
                              | HCI_LE_SUP_FEAT_PRR_ADV_ADI\
                              | HCI_LE_SUP_FEAT_SUBRATING \
                              | HCI_LE_SUP_FEAT_CHAN_CLASSIFICATION)
+#endif // BT_53
 
+#if (BT_54)
+#define LL_FEATURES_BYTE5 ( HCI_LE_SUP_FEAT_ADV_CODING_SELECTION \
+                             | HCI_LE_SUP_FEAT_ADV_CODING_SELECTION_HOST_SUPPORT \
+                             | HCI_LE_SUP_FEAT_PER_ADV_WITH_RESP_ADVERTISER \
+                             | HCI_LE_SUP_FEAT_PER_ADV_WITH_RESP_SCANNER)
+#else
 #define LL_FEATURES_BYTE5 ( HCI_LE_SUP_FEAT_ADV_CODING_SELECTION \
                              | HCI_LE_SUP_FEAT_PER_ADV_WITH_RESP_ADVERTISER \
                              | HCI_LE_SUP_FEAT_PER_ADV_WITH_RESP_SCANNER)
+#endif // BT_54
 
 #define TX_POWER_LEVEL_DEFAULT TX_POWER_LEVEL_0P0_dBm
 

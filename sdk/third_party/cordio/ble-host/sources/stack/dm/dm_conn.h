@@ -78,7 +78,10 @@ enum
   DM_CONN_MSG_API_REM_CONN_PARAM_REQ_NEG_REPLY,
   DM_CONN_MSG_API_SET_DATA_LEN,
   DM_CONN_MSG_API_WRITE_AUTH_TO,
-  DM_CONN_MSG_API_REQ_PEER_SCA
+  DM_CONN_MSG_API_REQ_PEER_SCA,
+#if (BT_53)
+  DM_CONN_MSG_API_SUBRATE_REQ,
+#endif // BT_53  
 };
 
 /*! DM conn event handler messages for connection update */
@@ -255,6 +258,16 @@ typedef struct
   wsfMsgHdr_t             hdr;
 } dmConnApiReqPeerSca_t;
 
+#if (BT_53)
+/*! Data structure for DM_CONN_MSG_API_SUBRATE_REQ */
+typedef struct
+{
+  wsfMsgHdr_t              hdr;
+  hciLeSubrateReq_t        subrate;
+} dmConnApiSubrateReq_t;
+
+#endif // BT_53
+
 /*! Union of all DM Conn 2 messages */
 typedef union
 {
@@ -266,6 +279,9 @@ typedef union
   dmConnApiSetDataLen_t               apiSetDataLen;
   dmConnApiWriteAuthPayloadTo_t       apiWriteAuthPayloadTo;
   dmConnApiReqPeerSca_t               apiReqPeerSca;
+#if (BT_53)
+  dmConnApiSubrateReq_t               apiSubrateReq;
+#endif // BT_53
 } dmConn2Msg_t;
 
 /*! Connection control block */

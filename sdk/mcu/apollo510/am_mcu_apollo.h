@@ -7,10 +7,20 @@
 //! This file provides all the includes necessary for an apollo device.
 //!
 //! @addtogroup hal mcu
-//
+//!
 //! @defgroup apollo510_hal apollo510
 //! @ingroup hal
 //! @{
+//!
+//! Purpose: This module provides the primary hardware abstraction layer
+//! header for Apollo510 class devices, including all necessary includes
+//! for ARM architecture features, security extensions, and vector
+//! processing capabilities. It enables comprehensive access to device
+//! peripherals, system configuration, and hardware-specific features
+//! for embedded applications requiring Apollo510 functionality. The
+//! module supports ARM Security Extensions (CMSE), M-Profile Vector
+//! Extension (MVE/Helium), and provides the foundation for all
+//! Apollo510 HAL modules and system integration.
 //
 //*****************************************************************************
 
@@ -48,7 +58,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-acc60980d8 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
