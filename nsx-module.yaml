@@ -1,0 +1,36 @@
+schema_version: 1
+
+module:
+  name: nsx-ambiqsuite-r5
+  type: sdk_provider
+  category: sdk_provider
+  provider: ambiqsuite-r5
+  version: "0.1.0"
+
+support:
+  ambiqsuite: true
+  zephyr: false
+
+build:
+  cmake:
+    package: nsx_soc_apollo510
+    targets:
+      - nsx::sdk_ambiqsuite_r5
+
+depends:
+  required: []
+  optional: []
+
+compatibility:
+  boards:
+    - apollo5b_evb
+    - apollo510_evb
+    - apollo510b_evb
+    - apollo330mP_evb
+  socs:
+    - apollo5b
+    - apollo510
+    - apollo510b
+    - apollo330P
+  toolchains:
+    - arm-none-eabi-gcc
