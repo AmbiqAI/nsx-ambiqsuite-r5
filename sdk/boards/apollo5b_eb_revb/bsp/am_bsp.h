@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -81,13 +81,6 @@ typedef enum
 //*****************************************************************************
 extern am_devices_display_hw_config_t g_sDispCfg;
 #endif // DISP_CTRL_IP
-
-//*****************************************************************************
-//
-// Enable the External USB Power Rails
-//
-//*****************************************************************************
-#define ENABLE_EXT_USB_PWR_RAILS
 
 //*****************************************************************************
 //

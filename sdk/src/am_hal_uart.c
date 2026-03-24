@@ -5,7 +5,7 @@
 //! @brief Hardware abstraction for the UART
 //!
 //! @addtogroup uart UART Functionality
-//! @ingroup apollo510_hal
+//! @ingroup apollo5b_hal
 //! @{
 //
 //*****************************************************************************
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -52,6 +52,8 @@
 #include <stdbool.h>
 #include "am_mcu_apollo.h"
 #include <string.h>
+
+
 
 //*****************************************************************************
 //
@@ -81,8 +83,9 @@
     if (1)                                                                  \
     {                                                                       \
         uint32_t delayus;                                                   \
-        delayus = 1000000 * 10 / pState->ui32BaudRate;   /* Delay for 10 bit (8 bits,start/stop) */  \
+        delayus = 1000000 / pState->ui32BaudRate;   /* Delay for 1 bit  */  \
         delayus += 1;                               /* Round up         */  \
+        delayus *= 10;                              /* 8 bits,start/stop*/  \
         am_hal_delay_us(delayus);                                           \
     }
 
@@ -136,26 +139,24 @@ typedef struct
     //! Pointer to the dma buffer descriptor queue
     //! This is allocated by the calling function in application space
     //! and is attached to this struct via a call to
-    //! am_hal_uart_stream_dmaQueueInit
+    //! am_hal_uart_dmaQueueInit
     //! @note Since it is allocated and passed in, this usually shouldn't be on the stack
     //
-    am_hal_uart_dma_config_t *psDmaQueue;
+    am_hal_uart_dma_tx_queue_t *psDmaQueue;
 
     //
     //! Most recently configured baud rate.
     //
     uint32_t ui32BaudRate;
 
-
-    am_hal_queue_t sTxQueue;
-    am_hal_queue_t sRxQueue;
-
-
     am_hal_uart_transfer_t sActiveRead;
     volatile uint32_t ui32BytesRead;
 
     am_hal_uart_transfer_t sActiveWrite;
     volatile uint32_t ui32BytesWritten;
+
+    am_hal_queue_t sTxQueue;
+    am_hal_queue_t sRxQueue;
 
     //
     //! Queued write/read implementation
@@ -184,7 +185,7 @@ typedef struct
     //! UART Dma mode
     //
 
-    //am_hal_uart_streaming_dma_mode_e eStreamingDmaMode;
+    am_hal_uart_async_dma_mode_e eAsyncDmaMode;
 
     bool bCurrentlyWriting;
 
@@ -208,7 +209,9 @@ am_hal_uart_state_t g_am_hal_uart_states[AM_REG_UART_NUM_MODULES];
 // Static function prototypes.
 //
 //*****************************************************************************
-
+static uint32_t config_baudrate(uint32_t ui32Module,
+                                uint32_t ui32DesiredBaudrate,
+                                uint32_t *pui32ActualBaud);
 
 static uint32_t blocking_write(void *pHandle,
                                const am_hal_uart_transfer_t *psTransfer);
@@ -232,7 +235,6 @@ static uint32_t rx_queue_update(void *pHandle);
 // Initialize the UART
 //
 //*****************************************************************************
-
 uint32_t
 am_hal_uart_initialize(uint32_t ui32Module, void **ppHandle)
 {
@@ -330,6 +332,12 @@ uint32_t
 am_hal_uart_power_control(void *pHandle, uint32_t ePowerState,
                           bool bRetainState)
 {
+    am_hal_uart_state_t *pState = (am_hal_uart_state_t *) pHandle;
+    uint32_t ui32Module = pState->ui32Module;
+
+    am_hal_pwrctrl_periph_e eUARTPowerModule = ((am_hal_pwrctrl_periph_e)
+                                                (AM_HAL_PWRCTRL_PERIPH_UART0 +
+                                                 ui32Module));
 
 #ifndef AM_HAL_DISABLE_API_VALIDATION
     //
@@ -340,12 +348,7 @@ am_hal_uart_power_control(void *pHandle, uint32_t ePowerState,
         return AM_HAL_STATUS_INVALID_HANDLE;
     }
 #endif
-    am_hal_uart_state_t *pState = (am_hal_uart_state_t *) pHandle;
-    uint32_t ui32Module = pState->ui32Module;
-
-    am_hal_pwrctrl_periph_e eUARTPowerModule = ((am_hal_pwrctrl_periph_e)
-                                                (AM_HAL_PWRCTRL_PERIPH_UART0 +
-                                                 ui32Module));
+    //
     // Decode the requested power state and update UART operation accordingly.
     //
     switch (ePowerState)
@@ -372,7 +375,7 @@ am_hal_uart_power_control(void *pHandle, uint32_t ePowerState,
                 if ( ( pState->ui32BaudRate > 1500000 ) && ( APOLLO5_GE_B1 ) )
                 {
                     // Resume D2ASPARE, force uart_gate.clken to be 1, making uart.pclk to be always-on
-                    MCUCTRL->D2ASPARE |= (MCUCTRL_D2ASPARE_UART0PLL_Msk << ui32Module);
+                    MCUCTRL->D2ASPARE_b.D2ASPARE |= (0x1UL << (22 + ui32Module));
                 }
                 am_hal_clkmgr_clock_request(pState->eClkSrc, (am_hal_clkmgr_user_id_e)(AM_HAL_CLKMGR_USER_ID_UART0 + ui32Module));
 
@@ -419,7 +422,7 @@ am_hal_uart_power_control(void *pHandle, uint32_t ePowerState,
             if ( ( pState->ui32BaudRate > 1500000 ) && ( APOLLO5_GE_B1 ) )
             {
                 // Clear D2ASPARE to save power
-                MCUCTRL->D2ASPARE &= ~(MCUCTRL_D2ASPARE_UART0PLL_Msk << ui32Module);
+                MCUCTRL->D2ASPARE_b.D2ASPARE &= ~(0x1UL << (22 + ui32Module));
             }
             am_hal_clkmgr_clock_release(pState->eClkSrc, (am_hal_clkmgr_user_id_e)(AM_HAL_CLKMGR_USER_ID_UART0 + ui32Module));
 
@@ -1083,10 +1086,10 @@ am_hal_uart_rx_abort(void *pHandle)
     }
     // Disable RX
     UARTn(ui32Module)->CR_b.RXE = 0;
-    if ( UARTn(ui32Module)->FR_b.BUSY )
+    do
     {
         ONE_BYTE_DELAY(pState);
-    }
+    }while ( UARTn(ui32Module)->FR_b.BUSY );
     // Clear FIFO and DMA count
     if ( pState->bDMABusy )
     {
@@ -1109,6 +1112,10 @@ am_hal_uart_rx_abort(void *pHandle)
 uint32_t
 am_hal_uart_configure(void *pHandle, const am_hal_uart_config_t *psConfig)
 {
+    am_hal_uart_state_t *pState = (am_hal_uart_state_t *) pHandle;
+    uint32_t ui32Module = pState->ui32Module;
+
+    uint32_t ui32ErrorStatus;
 
 #ifndef AM_HAL_DISABLE_API_VALIDATION
     //
@@ -1119,9 +1126,6 @@ am_hal_uart_configure(void *pHandle, const am_hal_uart_config_t *psConfig)
         return AM_HAL_STATUS_INVALID_HANDLE;
     }
 #endif
-    am_hal_uart_state_t *pState = (am_hal_uart_state_t *) pHandle;
-    uint32_t ui32Module = pState->ui32Module;
-
     //
     // Reset the CR register to a known value.
     //
@@ -1132,6 +1136,8 @@ am_hal_uart_configure(void *pHandle, const am_hal_uart_config_t *psConfig)
     // section.
     //
     UARTn(ui32Module)->CR_b.CLKEN = 1;
+
+    pState->eAsyncDmaMode = psConfig->eAsyncDMAMode;
 
     // B0 does not support SYSPLL
     if ( ( psConfig->eClockSrc > AM_HAL_UART_CLOCK_SRC_SYSPLL ) ||
@@ -1145,17 +1151,12 @@ am_hal_uart_configure(void *pHandle, const am_hal_uart_config_t *psConfig)
         if ( APOLLO5_GE_B1 )
         {
             // Set D2ASPARE, force uart_gate.clken to be 1, making uart.pclk to be always-on
-            MCUCTRL->D2ASPARE |= (MCUCTRL_D2ASPARE_UART0PLL_Msk << ui32Module);
+            MCUCTRL->D2ASPARE_b.D2ASPARE |= (0x1UL << (22 + ui32Module));
         }
         UARTn(ui32Module)->CR_b.CLKSEL = (pState->eClkSrc == AM_HAL_CLKMGR_CLK_ID_SYSPLL) ? UART0_CR_CLKSEL_PLL_CLK : UART0_CR_CLKSEL_HFRC_48MHZ;
     }
     else
     {
-        if ( APOLLO5_GE_B1 )
-        {
-            // Clear D2ASPARE to save power
-            MCUCTRL->D2ASPARE &= ~(MCUCTRL_D2ASPARE_UART0PLL_Msk << ui32Module);
-        }
         UARTn(ui32Module)->CR_b.CLKSEL = (pState->eClkSrc == AM_HAL_CLKMGR_CLK_ID_SYSPLL) ? UART0_CR_CLKSEL_PLL_CLK : UART0_CR_CLKSEL_HFRC_24MHZ;
     }
     am_hal_clkmgr_clock_request(pState->eClkSrc, (am_hal_clkmgr_user_id_e)(AM_HAL_CLKMGR_USER_ID_UART0 + ui32Module));
@@ -1172,7 +1173,7 @@ am_hal_uart_configure(void *pHandle, const am_hal_uart_config_t *psConfig)
     //
     // Set the baud rate.
     //
-    uint32_t ui32ErrorStatus = config_baudrate(ui32Module,
+    ui32ErrorStatus = config_baudrate(ui32Module,
                                       psConfig->ui32BaudRate,
                                       &(pState->ui32BaudRate));
 
@@ -2278,6 +2279,1210 @@ am_hal_uart_interrupt_service(void *pHandle, uint32_t ui32Status)
     return AM_HAL_STATUS_FAIL;
 }
 
+
+//*****************************************************************************
+//
+// Manage UART ISR used when uart fifos and tx and rx queues are enabled
+// This is a nonblocking, non-signaling uart driver, it saves incoming rx data
+// in the rx queue, and transmits tx data from the queue.via fifo or DMA
+//
+//*****************************************************************************
+am_hal_uart_async_status_t
+am_hal_uart_interrupt_queue_service(void *pHandle)
+{
+    am_hal_uart_state_t *pState = pHandle;
+    volatile UART0_Type *pUart = UARTn(pState->ui32Module);
+
+    am_hal_uart_async_status_t ui32RetStat = AM_HAL_UART_ASYNC_STATUS_SUCCESS;
+
+    //
+    // manage rx fifo data
+    //
+    if (pUart->MIS & (UART0_MIS_RTMIS_Msk | UART0_MIS_RXMIS_Msk))
+    {
+        //
+        // read the fifo data, save into the rx queue
+        //
+        am_hal_queue_t *pRxQ = &pState->sRxQueue;
+        uint32_t ui32QueSize = pRxQ->ui32Capacity;
+        uint8_t *pui8QueBuff = pRxQ->pui8Data;
+        //
+        // @note: if the output buffer is read from a higher priority ISR
+        //  this next block should be in a critical section
+        //
+        {
+            uint32_t ui32WrtIdx = pRxQ->ui32WriteIndex;
+            uint32_t ui32NumInQue = pRxQ->ui32Length;
+
+            //
+            // loop while there is data in the queue
+            // and there is storage to save the incoming data
+            //
+            while (!(pUart->FR & UART0_FR_RXFE_Msk))
+            {
+                uint32_t ui32RdDr = pUart->DR;
+
+                //
+                // capture any read error flags
+                //
+                ui32RetStat |= (ui32RdDr & AM_HAL_UART_ASYNC_STATUS_INTRNL_MSK);
+                pui8QueBuff[ui32WrtIdx] = (uint8_t) ui32RdDr;
+                if (++ui32NumInQue > ui32QueSize)
+                {
+                    //
+                    // queue is at the limit, can't write this data
+                    //
+                    ui32NumInQue = ui32QueSize;
+                    ui32RetStat |= AM_HAL_UART_ASYNC_STATUS_RX_QUEUE_FULL;
+                    break;
+                }
+                if (++ui32WrtIdx >= ui32QueSize)
+                {
+                    ui32WrtIdx = 0;
+                }
+            }
+            pRxQ->ui32WriteIndex = ui32WrtIdx;
+            if (pRxQ->ui32Length != ui32NumInQue)
+            {
+                //
+                // new data has been added to the rx buffer
+                //
+                ui32RetStat |= AM_HAL_UART_ASYNC_STATUS_RX_DATA_AVAIL;
+                pRxQ->ui32Length = ui32NumInQue;
+            }
+
+            //
+            // Clear these Interrupts (rx fifo and rx timeout)
+            //
+            pUart->IEC = (UART0_IEC_RTIC_Msk | UART0_IEC_RXIC_Msk);
+        }
+
+    } // ui32IES_int & (AM_HAL_UART_INT_RX | AM_HAL_UART_INT_RX_TMOUT
+
+    //
+    // =============== tx management ================================
+    //
+
+    //
+    // tx dma support
+    // rx dma is not supported in this function
+    //
+    if (pUart->MIS & UART0_MIS_DMAEMIS_Msk)
+    {
+        //
+        // DMA error? This is not ideal.
+        // Shut all DMA off
+        //
+        pUart->DCR      = 0;  // stop dma
+        pUart->IER      &= ~(UART0_IER_DMAEIM_Msk | UART0_IER_DMACPIM_Msk | UART0_IER_TXIM_Msk | UART0_IER_TXCMPMIM_Msk);
+        pUart->IEC      = UART0_IEC_DMAEIC_Msk | UART0_IEC_DMACPIC_Msk | UART0_IEC_TXCMPMIC_Msk | UART0_IEC_TXIC_Msk;
+
+        ui32RetStat     |= AM_HAL_UART_ASYNC_STATUS_DMA_ERROR;
+    } // pUart->MIS & UART0_MIS_DMAEMIS_Msk, dma error
+
+
+    if (pUart->MIS & UART0_MIS_DMACPMIS_Msk)
+    {
+        //
+        // DMA complete interrupt
+        //
+        am_hal_uart_dma_tx_queue_t *psDmaQ = pState->psDmaQueue;
+
+        am_hal_uart_dma_tx_descriptor_entry_t *activeDesc = psDmaQ->activeDmaTxDesc;
+#ifndef AM_HAL_DISABLE_API_VALIDATION
+        if (activeDesc == NULL)
+        {
+            // This is an unexpected internal error, disable this DMA transfer.
+            // @note, if a dma complete interrupt occurs, there should be an active descriptor.
+            pUart->DCR      = 0;  // stop dma
+            pUart->IER      &= ~(UART0_IER_DMAEIM_Msk | UART0_IER_DMACPIM_Msk | UART0_IER_TXIM_Msk | UART0_IER_TXCMPMIM_Msk);
+            pUart->IEC      = UART0_IEC_DMAEIC_Msk | UART0_IEC_DMACPIC_Msk | UART0_IEC_TXCMPMIC_Msk | UART0_IEC_TXIC_Msk;
+
+            ui32RetStat     |= AM_HAL_UART_ASYNC_STATUS_INTERNAL_DMA_ERROR;
+            return ui32RetStat;
+        }
+#endif
+        if (activeDesc->ui32NumBytes == 0)
+        {
+            //
+            // All the data in this descriptor has been transmitted, switch to the next descriptor.
+            // The next descriptor may also contain no data: That will be taken care of below.
+            //
+            activeDesc->ui32NumDmaQueued = 0;
+            activeDesc->ui32StartAddress = activeDesc->ui32BuffBaseAddr; // reset start address
+            activeDesc               = activeDesc->nextDesc;
+            //
+            // }else(activeDesc->ui32NumBytes != 0){
+            // if activeDesc->ui32NumBytes is non zero:
+            // this descriptor still contains data to send (probably due to dma size limit on the previous DMA)
+            //
+        }
+
+        if (psDmaQ->eAsyncDmaMode == AM_HAL_UART_DMA_TX_SINGLE_BUFFER)
+        {
+            //
+            // This is a circular buffer scheme
+            // check if there is another descriptor/buffer to start transmitting
+            //
+            am_hal_uart_dma_tx_descriptor_entry_t *currDesc = activeDesc;
+
+            if (currDesc->ui32NumBytes)
+            {
+                //
+                // The next buffer contains data, so start sending that now.
+                // Make it the new current buffer, and set that buffer active.
+                //
+                psDmaQ->activeDmaTxDesc = currDesc;
+
+                pUart->DCR              = 0;  // stop dma
+                pUart->TARGADDR         = currDesc->ui32StartAddress;  // set new address
+                uint32_t  ui32TxCount   = currDesc->ui32NumBytes;      //
+                if (ui32TxCount > AM_HAL_MAX_UART_DMA_SIZE)
+                {
+                    ui32TxCount         = AM_HAL_MAX_UART_DMA_SIZE;
+                }
+
+                pUart->COUNT                = ui32TxCount;
+                currDesc->ui32NumDmaQueued  = ui32TxCount;
+                currDesc->ui32NumBytes      -= ui32TxCount;
+                currDesc->ui32StartAddress  += ui32TxCount;
+
+                __DMB();
+                //
+                // disable tx complete interrupts, enable dma interrupts
+                //
+                pUart->IER      = (pUart->IER & ~(UART0_IER_TXIM_Msk | UART0_IER_TXCMPMIM_Msk)) |
+                                  (UART0_IER_DMAEIM_Msk | UART0_IER_DMACPIM_Msk);
+                //
+                // clear and setup interrupts
+                //
+                pUart->IEC      = UART0_IEC_DMAEIC_Msk | UART0_IEC_DMACPIC_Msk |
+                                  UART0_IEC_TXCMPMIC_Msk | UART0_IEC_TXIC_Msk;
+
+                pUart->DCR      = UART0_DCR_DMAPRI_Msk | UART0_DCR_TXDMAE_Msk;  // enable dma
+
+                if (psDmaQ->nextDmaWrtDesc == currDesc)
+                {
+                    //
+                    // The current (active DMA) descr is now the same as the append descriptor,
+                    // That is invalid (but expected).
+                    // Now need to advance and init the append descriptor.
+                    //
+                    am_hal_uart_dma_tx_descriptor_entry_t *nextw = currDesc->nextDesc;  // next append descriptor
+                    //
+                    // Init the new append descriptor
+                    // Take the write address (start + number) for the existing current descriptor
+                    // and use that in the next append descriptor.
+                    //
+                    uint32_t nextStartAddr      = currDesc->ui32StartAddress;
+                    if (nextStartAddr >= psDmaQ->queueEndAddr )
+                    {
+                        nextStartAddr           = psDmaQ->queueStartAddr;
+                    }
+                    nextw->ui32StartAddress     = nextStartAddr;
+                    nextw->ui32NumBytes         = 0; // should already be zero
+                    psDmaQ->nextDmaWrtDesc      = nextw;
+
+
+                }
+                ui32RetStat |= AM_HAL_UART_ASYNC_STATUS_TX_DMA_BUSY;
+            }
+            else
+            {
+                //
+                // no data left
+                //
+                if (psDmaQ->activeDmaTxDesc)
+                {
+                    psDmaQ->activeDmaTxDesc->ui32NumDmaQueued = 0;
+                    psDmaQ->activeDmaTxDesc = NULL;
+                }
+
+                pUart->DCR              = 0;  // stop dma
+
+                //
+                // clear and disable tx and DMA interrupts
+                // non DMA code, don't clear tx complete, it may have completed before this code has been run
+                //
+                pUart->IER = (pUart->IER & ~(UART0_IER_DMAEIM_Msk | UART0_IER_DMACPIM_Msk | UART0_IER_TXIM_Msk)) |
+                             (UART0_IER_TXCMPMIM_Msk);
+                pUart->IEC = UART0_IEC_DMAEIC_Msk | UART0_IEC_DMACPIC_Msk | UART0_IEC_TXIC_Msk;
+                ui32RetStat |= AM_HAL_UART_ASYNC_STATUS_TX_DMA_COMPLETE;
+            }
+        }
+        else
+        {
+            //
+            // This is a double buffer scheme
+            //
+            if (activeDesc->ui32NumBytes)
+            {
+                //
+                // The buffer contains data, so start sending that now.
+                //
+                psDmaQ->activeDmaTxDesc = activeDesc;
+                pUart->DCR              = 0;  // stop dma
+                pUart->TARGADDR         = activeDesc->ui32StartAddress;  // set new address
+
+                uint32_t count = activeDesc->ui32NumBytes;      // set new dma size
+                if ( count > AM_HAL_MAX_UART_DMA_SIZE)
+                {
+                    count = AM_HAL_MAX_UART_DMA_SIZE;
+                    //
+                    // do not advance to next dma descriptor, there is data left
+                    //
+                }
+
+                pUart->COUNT                 = count;      // set new dma size
+                activeDesc->ui32NumDmaQueued = count;
+                activeDesc->ui32NumBytes     -= count;
+                activeDesc->ui32StartAddress += count;
+                __DMB();                //
+
+                //
+                // disable tx complete interrupts, enable dma interrupts
+                //
+                pUart->IER              = (pUart->IER & ~(UART0_IER_TXIM_Msk | UART0_IER_TXCMPMIM_Msk)) |
+                                          (UART0_IER_DMAEIM_Msk | UART0_IER_DMACPIM_Msk);
+                //
+                // clear and setup interrupts
+                //
+                pUart->IEC              = UART0_IEC_DMAEIC_Msk | UART0_IEC_DMACPIC_Msk |
+                                          UART0_IEC_TXCMPMIC_Msk | UART0_IEC_TXIC_Msk;
+
+                pUart->DCR              = UART0_DCR_DMAPRI_Msk | UART0_DCR_TXDMAE_Msk;  // enable dma
+                ui32RetStat             |= AM_HAL_UART_ASYNC_STATUS_TX_DMA_BUSY;
+            }
+            else
+            {
+                //
+                // no more data, DMA complete, stop dma
+                //
+                if (psDmaQ->activeDmaTxDesc)
+                {
+                    psDmaQ->activeDmaTxDesc->ui32NumDmaQueued = 0;
+                    psDmaQ->activeDmaTxDesc = NULL;
+                }
+
+                pUart->DCR              = 0;  // stop dma
+
+                //
+                // clear and disable tx and DMA interrupts
+                // Tx fifo is probably still emptying, don't stop tx, optionally enable tx complete interrupt,
+                // check tx comp handling code, may need to be rewritten, which could cause compatibility headache with older
+                // non DMA code, don't clear tx complete, it may have completed before this code has been run
+                //
+                pUart->IER              =
+                    (pUart->IER & ~(UART0_IER_DMAEIM_Msk | UART0_IER_DMACPIM_Msk | UART0_IER_TXIM_Msk)) |
+                    (UART0_IER_TXCMPMIM_Msk);
+                pUart->IEC              = UART0_IEC_DMAEIC_Msk | UART0_IEC_DMACPIC_Msk | UART0_IEC_TXIC_Msk;
+                ui32RetStat             |= AM_HAL_UART_ASYNC_STATUS_TX_DMA_COMPLETE;
+            }
+        } // single or double buffer mode
+    } // pUart->MIS & UART0_MIS_DMACPMIS_Msk :: big dma complete interrupt block
+
+    //
+    // manage tx fifo data
+    //
+    if (pUart->MIS & UART0_MIS_TXMIS_Msk)
+    {
+        //
+        // When here, the tx interrupt is enabled
+        // and the interrupt is active
+        //
+        am_hal_queue_t *pTxQ = &pState->sTxQueue;
+        //
+        // @note: This critical section is not needed if:
+        // uart send isn't called in higher priority ISRs
+        //
+        AM_CRITICAL_BEGIN
+            uint32_t ui32NumInQue = pTxQ->ui32Length;
+            if (ui32NumInQue)
+            {
+                //
+                // There is data to transmit
+                // move data from the tx queue to the tx fifo
+                //
+                uint8_t *pui8QueBuff = pTxQ->pui8Data;
+                uint32_t ui32QueSize = pTxQ->ui32Capacity;
+                uint32_t ui32RdIdx = pTxQ->ui32ReadIndex;
+                //
+                // Clear these Tx Interrupts
+                //
+                pUart->IEC = UART0_IEC_TXCMPMIC_Msk | UART0_IEC_TXIC_Msk;
+
+                while (ui32NumInQue && !(pUart->FR & UART0_FR_TXFF_Msk))
+                {
+                    pUart->DR = pui8QueBuff[ui32RdIdx];
+                    if (++ui32RdIdx >= ui32QueSize)
+                    {
+                        ui32RdIdx = 0;
+                    }
+                    ui32NumInQue--;
+                }
+                pTxQ->ui32ReadIndex = ui32RdIdx;
+                pTxQ->ui32Length = ui32NumInQue;
+                if (ui32NumInQue == 0)
+                {
+                    //
+                    // Nothing left in queue, disable this interrupt
+                    // enable the tx complete interrupt
+                    //
+                    pUart->IER = (pUart->IER & ~UART0_IER_TXIM_Msk) | UART0_IER_TXCMPMIM_Msk;
+                }
+                else
+                {
+                    //
+                    // There is still data in the queue,
+                    // so at least one more txim interrupt is needed
+                    // tx complete interrupt is not needed until the queue is empty
+                    //
+                    pUart->IER = (pUart->IER & ~UART0_IER_TXCMPMIM_Msk) | UART0_IER_TXIM_Msk;
+                }
+                ui32RetStat |= AM_HAL_UART_ASYNC_STATUS_TX_BUSY;
+            }
+            else
+            {
+                //
+                // there is nothing in the queue
+                // clear and disable this interrupt, this code should not be executed
+                // there could still be some data in the tx fifo
+                //
+                pUart->IEC = UART0_IEC_TXIC_Msk;
+                pUart->IER &= ~UART0_IER_TXIM_Msk;
+
+            }
+        AM_CRITICAL_END
+
+    } // ui32IES_int & UART0_IER_TXIM_Msk
+
+    if (pUart->MIS & UART0_MIS_TXCMPMMIS_Msk)
+    {
+
+        //
+        // tx complete, clear and disable this interrupt
+        //
+        pUart->IEC = UART0_IEC_TXCMPMIC_Msk;
+        //
+        // @note: This critical section is not needed if:
+        // uart send isn't called in higher priority ISRs
+        //
+        AM_CRITICAL_BEGIN
+            pUart->IER &= ~UART0_IER_TXCMPMIM_Msk;
+        AM_CRITICAL_END
+        ui32RetStat &= ~AM_HAL_UART_ASYNC_STATUS_TX_BUSY;
+        ui32RetStat |= AM_HAL_UART_ASYNC_STATUS_TX_COMPLETE;
+    } // pUart->MIS & UART0_MIS_TXCMPMMIS_Msk
+
+    return ui32RetStat;
+
+} // am_hal_uart_interrupt_queue_service
+
+//*****************************************************************************
+//
+// Choose the correct function based on DMA mode for tx append.
+//
+//*****************************************************************************
+am_hal_uart_errors_t
+am_hal_async_uart_append_tx(void *pHandle, uint8_t *pui8Buff, uint32_t ui32NumBytes)
+{
+    if ( pHandle )
+    {
+        am_hal_uart_state_t *pState = (am_hal_uart_state_t *) pHandle;
+        am_hal_uart_async_dma_mode_e eDmaMode = pState->eAsyncDmaMode;
+        switch(eDmaMode)
+        {
+            case AM_HAL_UART_DMA_NONE:
+                return am_hal_uart_append_tx_fifo(pHandle, pui8Buff, ui32NumBytes);
+
+            case AM_HAL_UART_DMA_TX_DOUBLE_BUFFER:
+                return am_hal_uart_append_tx_double(pHandle, pui8Buff, ui32NumBytes);
+
+            case AM_HAL_UART_DMA_TX_SINGLE_BUFFER:
+                return am_hal_uart_append_tx_single(pHandle, pui8Buff, ui32NumBytes);
+
+            case AM_HAL_UART_DMA_RX:
+            case AM_HAL_UART_DMA_RX_TX_DOUBLE:
+            case AM_HAL_UART_DMA_RX_TX_SINGLE:
+            case AM_HAL_UART_DMA_MODE_ENTRIES:
+                break;
+        }
+    }
+
+    return (am_hal_uart_errors_t) AM_HAL_STATUS_INVALID_ARG;
+}
+
+//*****************************************************************************
+//
+// Append data into the uart tx output queue, not using DMA
+//
+//*****************************************************************************
+am_hal_uart_errors_t
+am_hal_uart_append_tx_fifo( void *pHandle, uint8_t *pui8Buff, uint32_t ui32NumBytes)
+{
+    if (ui32NumBytes == 0)
+    {
+        return AM_HAL_UART_STATUS_SUCCESS;
+    }
+
+    am_hal_uart_state_t *pState = (am_hal_uart_state_t *) pHandle;
+
+    if (pState == NULL)
+    {
+        return (am_hal_uart_errors_t) AM_HAL_STATUS_INVALID_HANDLE;
+    }
+
+    am_hal_queue_t *pTxQ = &pState->sTxQueue;
+    if (pTxQ->pui8Data == NULL)
+    {
+        //
+        // the user needs to define the queue
+        //
+        return AM_HAL_UART_ERR_DMA_NO_INIT;
+    }
+
+    volatile UART0_Type *pUart = UARTn(pState->ui32Module);
+
+    am_hal_uart_errors_t eReturnStat = AM_HAL_UART_STATUS_SUCCESS;
+
+    AM_CRITICAL_BEGIN
+    do
+    {
+        //
+        // clear pending tx interrupts
+        //
+        pUart->IEC = UART0_IEC_TXCMPMIC_Msk | UART0_IEC_TXIC_Msk;
+
+        uint32_t bytesInQueue = pTxQ->ui32Length;
+
+        //
+        // Only write to fifo once, before or after filling the queue:
+        // if queue is empty write buffer fifo first, then reducing
+        // (or eliminating) the need to save that data in the queue.
+        //
+        bool fifoFilled = false;
+        if (bytesInQueue == 0)
+        {
+            fifoFilled = true;
+            //
+            // nothing in the queue, so start by dumping incoming data into fifo
+            //
+            while (ui32NumBytes && !(pUart->FR & UART0_FR_TXFF_Msk))
+            {
+                pUart->DR = *pui8Buff++;
+                ui32NumBytes--;
+            }
+        }
+
+        uint8_t  *txQueueBuff = pTxQ->pui8Data;
+        uint32_t ui32Wi       = pTxQ->ui32WriteIndex;
+        uint32_t ui32Maxi    = pTxQ->ui32Capacity;
+
+        if (ui32NumBytes)
+        {
+            //
+            // put remainder in queue
+            //
+            bytesInQueue += ui32NumBytes;
+            if (bytesInQueue > ui32Maxi)
+            {
+                eReturnStat = AM_HAL_UART_ERR_BUFFER_OVERFILL;
+                break;
+            }
+
+            do
+            {
+                //
+                // fill circular buffer
+                //
+                txQueueBuff[ui32Wi] = *pui8Buff++;
+                if (++ui32Wi >= ui32Maxi)
+                {
+                    ui32Wi = 0;
+                }
+            }
+            while (--ui32NumBytes);
+            pTxQ->ui32WriteIndex = ui32Wi;
+        }
+
+        if (!fifoFilled)
+        {
+            //
+            // fifo has not been filled this pass, so
+            // fill fifo with data from queue
+            //
+            uint32_t ui32RdIdx = pTxQ->ui32ReadIndex;
+
+            while (bytesInQueue && !(pUart->FR & UART0_FR_TXFF_Msk))
+            {
+                //
+                // move data from circular buffer into queue
+                //
+                pUart->DR = txQueueBuff[ui32RdIdx];
+                if (++ui32RdIdx >= ui32Maxi)
+                {
+                    ui32RdIdx = 0;
+                }
+                bytesInQueue--;
+            }
+            pTxQ->ui32ReadIndex = ui32RdIdx;
+        }
+        pTxQ->ui32Length     = bytesInQueue;
+
+        if (bytesInQueue)
+        {
+            //
+            // enable the tx fifo low interrupt, that will manage fifo filling from queue
+            //
+            pUart->IER = (pUart->IER & ~UART0_IER_TXCMPMIM_Msk) | UART0_IER_TXIM_Msk;
+        }
+        else
+        {
+            //
+            // queue is empty, but fifo has data, enable transmit complete interrupt
+            //
+            pUart->IER = (pUart->IER & ~UART0_IER_TXIM_Msk) | UART0_IER_TXCMPMIM_Msk;
+        }
+    }
+    while(false);
+
+    AM_CRITICAL_END
+
+    return eReturnStat;
+} // am_hal_uart_append_tx
+//*****************************************************************************
+//
+// Append data into the uart tx output queue
+//
+//*****************************************************************************
+
+//****************************** DMA tx async code ********************************
+
+//*****************************************************************************
+//
+// Set-up the DMA queue buffer descriptors depending on the dma mode chosen
+//
+//*****************************************************************************
+uint32_t
+am_hal_uart_dmaQueueInit(void *pHandle,
+                         am_hal_uart_async_dma_mode_e eAsyncDmaMode,
+                         am_hal_uart_dma_tx_queue_t *psDmaQ)
+{
+
+    if ( (eAsyncDmaMode != AM_HAL_UART_DMA_TX_DOUBLE_BUFFER) &&
+         (eAsyncDmaMode != AM_HAL_UART_DMA_TX_SINGLE_BUFFER ) )
+    {
+        return AM_HAL_STATUS_INVALID_ARG;
+    }
+
+    am_hal_uart_state_t *pState = (am_hal_uart_state_t *) pHandle;
+
+#ifndef AM_HAL_DISABLE_API_VALIDATION
+    if ( pState == NULL)
+    {
+        return AM_HAL_STATUS_INVALID_ARG;
+    }
+#endif
+
+    pState->psDmaQueue      = psDmaQ;
+    pState->eAsyncDmaMode   = eAsyncDmaMode;
+
+    psDmaQ->activeDmaTxDesc = 0;
+    psDmaQ->nextDmaWrtDesc  = &psDmaQ->tDescriptor[0];
+    psDmaQ->eAsyncDmaMode   = eAsyncDmaMode;
+
+    am_hal_uart_dma_tx_descriptor_entry_t *qe = psDmaQ->tDescriptor;
+
+    if (pState->sTxQueue.pui8Data == NULL)
+    {
+        return AM_HAL_STATUS_INVALID_ARG;
+    }
+
+    memset(qe, 0, sizeof(psDmaQ->tDescriptor));
+    uint32_t txQueueAddr    = (uint32_t) pState->sTxQueue.pui8Data;
+
+    qe[0].descIdx           = 0;
+    qe[1].descIdx           = 1;
+    qe[2].descIdx           = 2;
+
+    if (eAsyncDmaMode == AM_HAL_UART_DMA_TX_SINGLE_BUFFER)
+    {
+        //
+        // Using three queue descriptors for circular buffer.
+        //
+        psDmaQ->bDmaQueueInited = true;
+        qe[0].nextDesc          = &qe[1];           // close the linked list
+        qe[1].nextDesc          = &qe[2];
+        qe[2].nextDesc          = &qe[0];
+
+        psDmaQ->queueStartAddr  = txQueueAddr;
+        //
+        // This is a circular buffer,
+        // pre-compute the end of buffer address
+        //
+        psDmaQ->queueEndAddr    = psDmaQ->queueStartAddr + pState->sTxQueue.ui32Capacity;
+    }
+    else if (eAsyncDmaMode == AM_HAL_UART_DMA_TX_DOUBLE_BUFFER)
+    {
+        //
+        // Using two queue descriptors, one for each buffer
+        //
+        psDmaQ->bDmaQueueInited = true;
+        qe[0].nextDesc          = &qe[1];        // close the linked list
+        qe[1].nextDesc          = &qe[0];
+
+        qe[0].ui32StartAddress = txQueueAddr;
+        qe[0].ui32BuffBaseAddr = txQueueAddr;
+
+        //
+        // split the tx buffer in half for double buffering
+        //
+        uint32_t ui32SubBufferSize = (pState->sTxQueue.ui32Capacity / 2) & ~0x03;
+        uint32_t ui32SecondBufferStartAddr = txQueueAddr + ui32SubBufferSize;
+        qe[1].ui32StartAddress = ui32SecondBufferStartAddr;
+        qe[1].ui32BuffBaseAddr = ui32SecondBufferStartAddr;
+
+        qe[0].ui32BufferSize = ui32SubBufferSize;
+        qe[1].ui32BufferSize = ui32SubBufferSize;
+    }
+
+    return AM_HAL_STATUS_SUCCESS;
+}
+
+//*****************************************************************************
+//
+// Append tx data with DMA
+// this is using the "one buffer / triple descriptor" method (circular buffer)
+//
+//*****************************************************************************
+am_hal_uart_errors_t
+am_hal_uart_append_tx_single( void *pHandle,
+                              uint8_t *pui8Buff,
+                              uint32_t ui32NumBytes)
+{
+    if (ui32NumBytes == 0)
+    {
+        //
+        // no data, nothing to do here
+        //
+        return (am_hal_uart_errors_t) AM_HAL_STATUS_SUCCESS;
+    }
+
+    am_hal_uart_state_t *pState = (am_hal_uart_state_t *) pHandle;
+
+#ifndef AM_HAL_DISABLE_API_VALIDATION
+    if (pState == NULL)
+    {
+        return (am_hal_uart_errors_t) AM_HAL_STATUS_INVALID_HANDLE;
+    }
+#endif
+
+    am_hal_uart_dma_tx_queue_t *psDma = pState->psDmaQueue;
+    if (psDma == NULL || !psDma->bDmaQueueInited)
+    {
+        return AM_HAL_UART_ERR_DMA_NO_INIT;
+    }
+
+    am_hal_uart_dma_tx_descriptor_entry_t *q = psDma->tDescriptor;
+    am_hal_uart_errors_t eReturnVal = AM_HAL_UART_STATUS_SUCCESS;
+
+    //
+    // Since the uart interrupt is also working on these DMA data structures,
+    // start a critical section (disable interrupts) when queueing DMA data
+    //
+    AM_CRITICAL_BEGIN
+
+    do
+    {
+        //
+        //! compute number of bytes currently in use.
+        //
+        uint32_t ui32BytesQueued = q[0].ui32NumBytes + q[1].ui32NumBytes + q[2].ui32NumBytes;
+        if (psDma->activeDmaTxDesc)
+        {
+            ui32BytesQueued += psDma->activeDmaTxDesc->ui32NumDmaQueued;
+        }
+
+        //
+        // compute total allocated buffer size
+        //
+        uint32_t ui32BuffSize = psDma->queueEndAddr - psDma->queueStartAddr;
+
+        //
+        // compute how many bytes can be queued
+        //
+        uint32_t ui32RoomLeft = ui32BuffSize - ui32BytesQueued;
+
+        if (ui32RoomLeft < ui32NumBytes)
+        {
+            //
+            // return not enough room for data
+            //
+            eReturnVal = AM_HAL_UART_ERR_BUFFER_OVERFILL;
+            break;
+        }
+
+        //
+        // if here, the data will fit in the buffer allocated
+        // find next copy location
+        //
+        am_hal_uart_dma_tx_descriptor_entry_t *psNextQ;
+        bool bStartDMA = false;
+        if (psDma->activeDmaTxDesc == 0)
+        {
+            //
+            // no active dma
+            //
+            if ( ui32BytesQueued )
+            {
+                //
+                // Error condition.
+                // This is inconsistent/invalid behavior, NO active DMA,
+                // but data is queued.
+                //
+                eReturnVal = AM_HAL_UART_ERR_MEMORY_ERROR_01;
+                break;
+            }
+
+            if (ui32NumBytes <= AM_HAL_UART_FIFO_MAX)
+            {
+                volatile UART0_Type *pUart = UARTn(pState->ui32Module);
+                //
+                // contents can fit if fifo is empty
+                // is fifo empty then no need for DMA
+                //
+                if (pUart->FR & UART0_FR_TXFE_Msk)
+                {
+
+                    pUart->DCR      = 0;  // stop dma
+
+                    //
+                    // fifo is empty, dump data into fifo
+                    //
+                    do
+                    {
+                        pUart->DR = *pui8Buff++;
+                    }
+                    while (--ui32NumBytes);
+
+                    //
+                    // setup interrupts
+                    // set TX complete interrupt, this could be optional
+                    // no need for DMA interrupt
+                    //
+                    pUart->IER      = (pUart->IER & ~(UART0_IER_DMAEIM_Msk | UART0_IER_DMACPIM_Msk | UART0_IER_TXIM_Msk)) |
+                                      (UART0_IER_TXCMPMIM_Msk);
+
+                    pUart->IEC      = UART0_IEC_DMAEIC_Msk | UART0_IEC_DMACPIC_Msk |
+                                      UART0_IEC_TXCMPMIC_Msk | UART0_IEC_TXIC_Msk;
+                    break; // exit critical section and this function
+                }
+            } // if ui32NumBytes <= AM_HAL_UART_FIFO_MAX
+
+            psNextQ                     = &psDma->tDescriptor[0];  // use the first descriptor
+            psNextQ->ui32StartAddress   = psDma->queueStartAddr;   // start at the beginning of circ buffer
+            //psDma->nextDmaWrtDesc       = psNextQ->nextDesc;       // set active write descriptor
+            bStartDMA                   = true;                    // since dma is not running, dma needs to be started
+            psDma->activeDmaTxDesc      = psNextQ;
+            psDma->nextDmaWrtDesc       = psNextQ;                 // once dma is startted will need to advance this
+
+        }
+        else
+        {
+            //
+            // there is dma running, so grab the current append/write descriptor
+            // there will be no need to start dma in this function
+            //
+            psNextQ                     = psDma->nextDmaWrtDesc;
+        }
+
+        //
+        // add new data at the end of any existing data
+        //
+        uint32_t ui32CopyStartAddr = psNextQ->ui32StartAddress + psNextQ->ui32NumBytes;
+        uint32_t ui32BuffHardEnd   = psDma->queueEndAddr;  // end of the cirular buffer
+        if (ui32CopyStartAddr >= ui32BuffHardEnd)
+        {
+            //
+            // this is a serious error, existing buffer is overlimit (off the end of the array)
+            // for some reason
+            //
+            eReturnVal = AM_HAL_UART_ERR_MEMORY_ERROR_02;
+            break;
+        }
+
+        //
+        // find the end of the new data in the accumulating descriptor
+        //
+        uint32_t ui32NewEnd   = ui32CopyStartAddr + ui32NumBytes;  // updated end of data in from start
+        uint32_t ui32CopySize = ui32NumBytes;
+
+        if (ui32NewEnd >= ui32BuffHardEnd)
+        {
+            //
+            // this copy will run off the end of the ciruclar buffer
+            // need to use two buffers to make this fit
+            //  reduce the size of the first copy
+            //
+            ui32CopySize = ui32BuffHardEnd - ui32CopyStartAddr;
+
+            psNextQ->ui32NumBytes += ui32CopySize;
+            //psNextQ->bWrapped      = true;  // is this used?
+
+            //
+            // will still need to do another copy, below, for the remainder of the data
+            //
+            memcpy((void *) ui32CopyStartAddr, pui8Buff, ui32CopySize);
+            ui32NumBytes -= ui32CopySize;
+            if (ui32NumBytes & 0x80000000)
+            {
+                //
+                // This value has gone negative, a serious error. This shouldn't happen
+                // This test can be removed if code proves reliable
+                //
+                eReturnVal = AM_HAL_UART_ERR_MEMORY_ERROR_03;
+                break;
+            }
+
+            //
+            // advance the write/append queue, since this wrapped
+            //
+            psNextQ                     = psNextQ->nextDesc;
+            psNextQ->ui32StartAddress   = psDma->queueStartAddr; // start at the beginning of the buffer
+            psNextQ->ui32NumBytes       = ui32NumBytes;
+            psDma->nextDmaWrtDesc       = psNextQ;
+
+            if (ui32NumBytes)
+            {
+                // buffer wrap
+                // so that ui32CopyStartAddr address is always the beginning of the buffer
+                // this buffer should be empty at this point
+
+                pui8Buff                += ui32CopySize;  // advance buffer pointer
+                memcpy((void *) psNextQ->ui32StartAddress, pui8Buff, ui32NumBytes);
+            } // ui32Numbytes != 0: second buffer copy
+        }
+        else // ui32NewEnd >= ui32BuffHardEnd
+        {
+            //
+            // all data will fit in buffer with one copy
+            //
+            memcpy((void *) ui32CopyStartAddr, pui8Buff, ui32CopySize);
+            psNextQ->ui32NumBytes += ui32CopySize;
+        } // ui32NewEnd >= ui32BuffHardEnd
+
+        if (bStartDMA)
+        {
+            am_hal_uart_dma_tx_descriptor_entry_t *psActiveDesc = psDma->activeDmaTxDesc;
+
+            volatile UART0_Type *pUart = UARTn(pState->ui32Module);
+
+            pUart->DCR      = 0;  // stop dma
+
+            pUart->TARGADDR             = psActiveDesc->ui32StartAddress;
+            uint32_t  ui32TxCount       = psActiveDesc->ui32NumBytes;
+            if (ui32TxCount > AM_HAL_MAX_UART_DMA_SIZE)
+            {
+                ui32TxCount                 = AM_HAL_MAX_UART_DMA_SIZE;
+            }
+            pUart->COUNT                    = ui32TxCount;
+            psActiveDesc->ui32NumDmaQueued  = ui32TxCount;
+            psActiveDesc->ui32NumBytes      -= ui32TxCount;
+            psActiveDesc->ui32StartAddress  += ui32TxCount;
+
+            __DMB();        // Ensure data is copied before starting DMA (it is necessary)
+
+            //
+            // clear and setup interrupts
+            //
+            pUart->IER      = (pUart->IER & ~(UART0_IER_TXCMPMIM_Msk | UART0_IER_TXIM_Msk)) |
+                              (UART0_IER_DMAEIM_Msk | UART0_IER_DMACPIM_Msk);
+            pUart->IEC      = UART0_IEC_DMAEIC_Msk | UART0_IEC_DMACPIC_Msk |
+                              UART0_IEC_TXCMPMIC_Msk | UART0_IEC_TXIC_Msk;
+
+            pUart->DCR      = UART0_DCR_DMAPRI_Msk | UART0_DCR_TXDMAE_Msk;  // start tx dma
+
+            if (psActiveDesc == psDma->nextDmaWrtDesc)
+            {
+                //
+                // the active buffer cannot also be the append buffer, need to advance the append buffer
+                //
+                am_hal_uart_dma_tx_descriptor_entry_t *psAppendDesc = psActiveDesc->nextDesc;
+                uint32_t ui32StartAddr = psActiveDesc->ui32StartAddress + psActiveDesc->ui32NumBytes;
+                if ( ui32StartAddr >= ui32BuffHardEnd )
+                {
+                    ui32StartAddr = psDma->queueStartAddr;  // static code analysis says this can't happen
+                }
+                psAppendDesc->ui32StartAddress  = ui32StartAddr;
+                psAppendDesc->ui32NumBytes      = 0;
+                psDma->nextDmaWrtDesc           = psAppendDesc;
+            } // psActiveDesc == psDma->nextDmaWrtDesc :  end of advance append desc
+
+        } // end of start DMA
+    }
+    while( false );
+
+
+    AM_CRITICAL_END
+
+    return eReturnVal;
+
+} // am_hal_uart_append_tx
+
+//*****************************************************************************
+//
+// This is for appending tx data while doing double buffered DMA
+//
+//*****************************************************************************
+am_hal_uart_errors_t
+am_hal_uart_append_tx_double( void *pHandle, uint8_t *pui8Buff, uint32_t ui32NumBytes)
+{
+    if (ui32NumBytes == 0)
+    {
+        // no data, nothing to do here
+        return AM_HAL_UART_STATUS_SUCCESS;
+    }
+
+    am_hal_uart_state_t *pState = (am_hal_uart_state_t *) pHandle;
+
+#ifndef AM_HAL_DISABLE_API_VALIDATION
+    if (pState == NULL)
+    {
+        return (am_hal_uart_errors_t) AM_HAL_STATUS_INVALID_HANDLE;
+    }
+#endif
+    am_hal_uart_dma_tx_queue_t *psDma = pState->psDmaQueue;
+    if (psDma == NULL || !psDma->bDmaQueueInited)
+    {
+        return AM_HAL_UART_ERR_DMA_NO_INIT;
+    }
+
+    am_hal_uart_errors_t eRetVal = AM_HAL_UART_STATUS_SUCCESS;
+
+    AM_CRITICAL_BEGIN
+        do
+        {
+            //
+            // find the current descriptor
+            //
+            am_hal_uart_dma_tx_descriptor_entry_t *currD = psDma->activeDmaTxDesc;
+
+            //
+            // find the descriptor that will be used to copy data into
+            //
+            am_hal_uart_dma_tx_descriptor_entry_t *psPendD;
+            if (currD == NULL)
+            {
+                //
+                // nothing transmitting
+                //
+                if (ui32NumBytes <= AM_HAL_UART_FIFO_MAX)
+                {
+                    //
+                    // contents can fit if the fifo is empty.
+                    // is fifo empty?
+                    // no need for DMA
+                    //
+                    volatile UART0_Type *pUart = UARTn(pState->ui32Module);
+
+                    pUart->DCR = 0;  // stop dma
+
+                    if (pUart->FR & UART0_FR_TXFE_Msk)
+                    {
+                        //
+                        // fifo is empty, dump data into fifo
+                        //
+                        do
+                        {
+                            pUart->DR = *pui8Buff++;
+                        }
+                        while (--ui32NumBytes);
+
+                        //
+                        // setup interrupts
+                        // set TX complete interrupt:
+                        // tx complete interrupt could be used to disable uar transmitter
+                        // for power savings.
+                        //
+                        pUart->IER =
+                            (pUart->IER & ~(UART0_IER_DMAEIM_Msk | UART0_IER_DMACPIM_Msk | UART0_IER_TXIM_Msk)) |
+                            (UART0_IER_TXCMPMIM_Msk);
+
+                        pUart->IEC = UART0_IEC_DMAEIC_Msk | UART0_IEC_DMACPIC_Msk |
+                                     UART0_IEC_TXCMPMIC_Msk | UART0_IEC_TXIC_Msk;
+
+                        break; // exit critical section and function
+
+                    }
+                } // if ui32NumBytes <= AM_HAL_UART_FIFO_MAX
+
+                psPendD                     = &psDma->tDescriptor[0];
+                uint32_t ui32BaseAddr       = psPendD->ui32BuffBaseAddr;
+                psPendD->ui32StartAddress   = ui32BaseAddr;
+                psPendD->ui32NumBytes       = 0;
+            }
+            else //currD == NULL
+            {
+                //
+                // DMA is active, so choose the other buffer
+                //
+                psPendD = currD->nextDesc;
+            } //currD == NULL
+
+            //
+            // compute unused buffer size
+            //
+            uint32_t ui32NumInQueue = psPendD->ui32NumBytes;
+            uint32_t ui32RoomLeft   = psPendD->ui32BufferSize - ui32NumInQueue;
+            if (ui32RoomLeft < ui32NumBytes)
+            {
+                //
+                // this data won't fit
+                // exit with error
+                //
+                eRetVal = AM_HAL_UART_ERR_BUFFER_OVERFILL;
+                break;  // exit critical section and function
+            }
+
+            //
+            // there is room left to save data in the output buffer
+            //
+            uint32_t ui32CopyStartAddr = psPendD->ui32StartAddress + ui32NumInQueue;  // start address in buffer
+            memcpy((void *) ui32CopyStartAddr, pui8Buff, ui32NumBytes);          // copy data into buffer
+            psPendD->ui32NumBytes = ui32NumInQueue + ui32NumBytes;             // update buffer size
+
+            if (currD == NULL)
+            {
+                //
+                // dma is not running, start dma
+                //
+                psDma->activeDmaTxDesc    = psPendD;
+
+                volatile UART0_Type *pUart = UARTn(pState->ui32Module);
+
+                pUart->DCR                = 0;  // stop dma
+                pUart->TARGADDR           = psPendD->ui32StartAddress;  // set start address
+                uint32_t ui32TxCount      = psPendD->ui32NumBytes;      // number of bytes for DMA
+                if (ui32TxCount > AM_HAL_MAX_UART_DMA_SIZE)
+                {
+                    ui32TxCount           = AM_HAL_MAX_UART_DMA_SIZE;
+                }
+                psPendD->ui32StartAddress += ui32TxCount;       // advance to next starting address
+                psPendD->ui32NumBytes     -= ui32TxCount;       // subtract number of bytes queued via DMA
+                pUart->COUNT              = ui32TxCount;        // queue this many bytes
+
+                __DMB();        // This is needed here to ensure data copy is complete before DMA start
+
+                //
+                // setup interrupts
+                //
+                pUart->IER      = (pUart->IER & ~(UART0_IER_TXCMPMIM_Msk | UART0_IER_TXIM_Msk)) |
+                                  (UART0_IER_DMAEIM_Msk | UART0_IER_DMACPIM_Msk);
+                pUart->IEC      = UART0_IEC_DMAEIC_Msk | UART0_IEC_DMACPIC_Msk |
+                                  UART0_IEC_TXCMPMIC_Msk | UART0_IEC_TXIC_Msk;
+
+                pUart->DCR      = UART0_DCR_DMAPRI_Msk | UART0_DCR_TXDMAE_Msk;  // start DMA
+
+            } // currD == NULL
+        }
+        while (false); // critical section do/while
+
+    AM_CRITICAL_END
+
+    return eRetVal;
+}
+
+//*****************************************************************************
+//
+// Get Rx Data
+//
+// This function will unload data from the queue and load the data into
+// a user supplied buffer.
+//
+//*****************************************************************************
+uint32_t
+am_hal_uart_async_get_rx_data(void *pHandle,
+                              uint8_t *pui8DestBuff,
+                              uint32_t ui32MaxBytesToRead )
+{
+    am_hal_uart_state_t *pState = (am_hal_uart_state_t *) pHandle;
+
+#ifdef OPTIONAL_UNLOAD_FIFO
+    //
+    // If the rx data timeout is enabled, reading the fifo here is unnecessary
+    // If using an RX queue, take all the pui8Data from the RX FIFO and add
+    // it to the internal queue.
+    //
+    if (pState->bEnableRxQueue)
+    {
+        rx_queue_update(pHandle);
+    }
+#endif
+
+    am_hal_queue_t *psRxQueue = &(pState->sRxQueue);
+
+    //
+    // read from queue (loaded via uart rx interrupt)
+    //
+    uint32_t ui32Wi    = psRxQueue->ui32WriteIndex;
+    uint32_t ui32Ri    = psRxQueue->ui32ReadIndex;
+    uint32_t ui32Size  = psRxQueue->ui32Capacity;
+    uint8_t  *pui8Data = psRxQueue->pui8Data;
+
+    if (ui32Ri >= ui32Size )
+    {
+        ui32Ri = 0;
+    }
+
+    uint32_t ui32NumRead = 0;
+
+    __DMB();
+
+    while(true)
+    {
+        if (ui32Ri == ui32Wi)
+        {
+            //
+            // queue is empty
+            //
+            break;
+        }
+        *pui8DestBuff++ = pui8Data[ui32Ri];
+        if (++ui32Ri >= ui32Size)
+        {
+            ui32Ri = 0;
+        }
+        if (++ui32NumRead >= ui32MaxBytesToRead)
+        {
+            //
+            // read limit reached
+            //
+            break;
+        }
+    }
+
+    if (ui32NumRead)
+    {
+        //
+        // Update number of bytes left in queue.
+        //
+        AM_CRITICAL_BEGIN
+            psRxQueue->ui32ReadIndex = ui32Ri;
+            uint32_t ui32NumInQueue = psRxQueue->ui32Length;
+            if (ui32NumInQueue > ui32NumRead)
+            {
+                ui32NumInQueue -= ui32NumRead;
+            }
+            else
+            {
+                ui32NumInQueue = 0;
+            }
+            psRxQueue->ui32Length = ui32NumInQueue;
+        AM_CRITICAL_END
+    }
+
+    return ui32NumRead;
+}
 
 //*****************************************************************************
 //

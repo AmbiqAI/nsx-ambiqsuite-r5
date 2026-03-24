@@ -365,6 +365,16 @@ static am_hal_usb_charger_type_e dcd_usb_charger_type;
 
 /*------------------------------------------------------------------*/
 
+#ifndef ENABLE_EXT_USB_PWR_RAILS
+
+#if defined(apollo5_eb) || defined(apollo5b_eb_revb)
+
+#define ENABLE_EXT_USB_PWR_RAILS
+
+#endif
+#endif // ENABLE_EXT_USB_PWR_RAILS
+
+
 //*****************************************************************************
 // This is called for a graceful USB power-up
 //*****************************************************************************
@@ -434,12 +444,14 @@ dcd_power_up(uint8_t rhport)
     // Override USB PHY Clock Selection if requested
     //
 #if (defined(CFG_TUD_AM_USBPHY_CLK_SRC))
-    #if defined(AM_PART_APOLLO510)
+    #if defined(AM_PART_APOLLO5B)
     am_hal_usb_set_phy_clk_source(pUSBHandle, CFG_TUD_AM_USBPHY_CLK_SRC);
+    #elif defined(AM_PART_APOLLO510L) && defined(CFG_TUD_AM_USBPHY_CLK_DIV)
+    am_hal_usb_set_phy_clk_source(pUSBHandle, CFG_TUD_AM_USBPHY_CLK_SRC, CFG_TUD_AM_USBPHY_CLK_DIV);
     #endif
 #endif
 
-#if defined(AM_PART_APOLLO510)
+#if ((defined(AM_PART_APOLLO5B) && !defined(APOLLO5_FPGA)) || defined(AM_PART_APOLLO510L))
     am_hal_usb_phy_clock_enable(pUSBHandle, true, eUsbSpeed);
 #endif
 
@@ -472,7 +484,7 @@ void dcd_power_down(uint8_t rhport)
   am_hal_usb_dev_speed_e eUsbSpeed = AM_HAL_USB_SPEED_FULL;
   am_hal_usb_set_dev_speed(pUSBHandle, eUsbSpeed);
 
-#if (defined(AM_PART_APOLLO510) && !defined(APOLLO5_FPGA))
+#if (defined(AM_PART_APOLLO5B) && !defined(APOLLO5_FPGA))
   am_hal_usb_phy_clock_enable(pUSBHandle, false, eUsbSpeed);
 #endif
 
@@ -536,7 +548,7 @@ dcd_init (uint8_t rhport)
     am_hal_usb_register_ep_xfer_complete_callback(pUSBHandle, dcd_usb_ep_xfer_complete_callback);
 
 
-#if defined (AM_PART_APOLLO510)
+#if defined (AM_PART_APOLLO5B)
 #if defined (AM_CFG_USB_DMA_MODE_0)
   am_hal_usb_set_xfer_mode(pUSBHandle, AM_HAL_USB_OUT_DMA_MODE_0);
   am_hal_usb_set_xfer_mode(pUSBHandle, AM_HAL_USB_IN_DMA_MODE_0);
@@ -546,7 +558,7 @@ dcd_init (uint8_t rhport)
 #endif
 #endif
 
-#if defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5B)
    dcd_ep_dbuf_configure();
 #endif
 
@@ -691,7 +703,7 @@ dcd_edpt_close(uint8_t rhport, uint8_t ep_addr)
 // is invoked to notify the stack
 //
 //*****************************************************************************
-#if defined (AM_PART_APOLLO510)
+#if defined (AM_PART_APOLLO5B)
 bool
 dcd_edpt_xfer (uint8_t rhport,
                uint8_t ep_addr,
@@ -797,7 +809,7 @@ dcd_disconnect(uint8_t rhport)
 #endif
 }
 
-#if defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5B)
 //*****************************************************************************
 //
 //! @brief Configure Double-Buffer settings to HAL

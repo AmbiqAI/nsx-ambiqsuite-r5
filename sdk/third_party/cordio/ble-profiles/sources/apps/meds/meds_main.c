@@ -191,7 +191,7 @@ static void medsDmCback(dmEvt_t *pDmEvt)
 
   if ((pMsg = WsfMsgAlloc(len)) != NULL)
   {
-    memcpy((uint8_t *)pMsg, (uint8_t *)pDmEvt, len);
+    memcpy(pMsg, pDmEvt, len);
     WsfMsgSend(medsCb.handlerId, pMsg);
   }
 }
@@ -235,7 +235,7 @@ void medsCccCback(attsCccEvt_t *pEvt)
 
   if ((pMsg = WsfMsgAlloc(sizeof(attsCccEvt_t))) != NULL)
   {
-    memcpy((uint8_t *)pMsg, (uint8_t *)pEvt, sizeof(attsCccEvt_t));
+    memcpy(pMsg, pEvt, sizeof(attsCccEvt_t));
     WsfMsgSend(medsCb.handlerId, pMsg);
   }
 }

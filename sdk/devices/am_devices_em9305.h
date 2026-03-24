@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef AM_DEVICES_EM9305_H
@@ -171,7 +171,7 @@ typedef enum
     HCI_VSC_END_TRANSMIT_TEST_CMD_OPCODE             = 0xFCC2,
     //Vendor Specific Command set Tx power level
     HCI_VSC_SET_TX_POWER_LEVEL_CMD_OPCODE            = 0xFCC4,
-    //! Ambiq Vendor Specific Command trigger Apollo510 and EM9305 to enter sleep
+    //! Ambiq Vendor Specific Command trigger Apollo5B and EM9305 to enter sleep
     HCI_VSC_ENTER_SLEEP_CMD_OPCODE                   = 0xFCF0,
     // Set local supported feature
     HCI_VSC_SET_LOCAL_SUP_FEAT_CMD_OPCODE            = 0xFFF2,

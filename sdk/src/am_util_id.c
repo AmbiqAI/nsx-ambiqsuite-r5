@@ -47,7 +47,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #include <stdint.h>
@@ -86,10 +86,16 @@ static const uint8_t g_DeviceNameApollo4p_blue[]   = "Apollo4 Blue Plus";
 #if defined(AM_ID_APOLLO4L)
 static const uint8_t g_DeviceNameApollo4l[]   = "Apollo4 Lite";
 #endif
-#if defined(AM_ID_APOLLO510)
+#if defined(AM_ID_APOLLO5A)
+static const uint8_t g_DeviceNameApollo5a[]   = "Apollo5 revA";
+#endif // AM_ID_APOLLO5A
+#if defined(AM_ID_APOLLO5B)
 static const uint8_t g_DeviceNameApollo510[]   = "Apollo510";
 static const uint8_t g_DeviceNameApollo510B[]  = "Apollo510B";
-#endif // AM_ID_APOLLO510
+#endif // AM_ID_APOLLO5B
+#if defined(AM_ID_APOLLO510L)
+static const uint8_t g_DeviceNameApollo510L[] = "Apollo510 Lite";
+#endif // AM_ID_APOLLO510L
 
 #ifdef AM_ID_PKGSTD
 //
@@ -130,7 +136,7 @@ revmaj_get(uint32_t ui32ChipRev)
 
 //*****************************************************************************
 // Update the ID structure with the appropriate ChipRev letter.
-// ui32minrevbase should be 0 for Apollo or Apollo2, 1 for Apollo3/4/5.
+// ui32minrevbase should be 0 for Apollo or Apollo2, 1 for Apollo3.
 //*****************************************************************************
 static void
 chiprev_set(am_util_id_t *psIDDevice, uint32_t ui32minrevbase)
@@ -142,7 +148,7 @@ chiprev_set(am_util_id_t *psIDDevice, uint32_t ui32minrevbase)
 
     //
     // For Apollo and Apollo2:  rev0=0, rev1=1, ... (0-based)
-    // For Apollo3/4/5:         rev0=1, rev1=2, ... (1-based)
+    // For Apollo3:             rev0=1, rev1=2, ... (1-based)
     //
     ui32min = ((psIDDevice->sMcuCtrlDevice.ui32ChipRev & 0x0F) >> 0);
     psIDDevice->ui8ChipRevMin = (uint8_t)('0' + ui32min - ui32minrevbase);
@@ -205,8 +211,8 @@ am_util_id_device(am_util_id_t *psIDDevice)
     // Do a specific check from JEDEC values to verify Ambiq as the vendor.
     //
     if ( ((psIDDevice->sMcuCtrlDevice.ui32JedecCID   == 0xB105100D)     &&
-          (psIDDevice->sMcuCtrlDevice.ui32JedecJEPID == 0x0000009B)     &&
-          ((psIDDevice->sMcuCtrlDevice.ui32JedecPN & 0xF00) == 0xE00)) )
+         (psIDDevice->sMcuCtrlDevice.ui32JedecJEPID == 0x0000009B)      &&
+         ((psIDDevice->sMcuCtrlDevice.ui32JedecPN & 0xF00) == 0xE00)) )
     {
         //
         // VENDORID is AMBQ. Set the manufacturer string pointer.
@@ -306,24 +312,47 @@ am_util_id_device(am_util_id_t *psIDDevice)
     }
 #endif // AM_ID_APOLLO4L
 
-#if defined(AM_ID_APOLLO510)
-        if ( ( ui32PN == AM_UTIL_MCUCTRL_CHIP_INFO_PARTNUM_APOLLO510)           &&
-                  ((psIDDevice->sMcuCtrlDevice.ui32JedecPN & 0xFF0) == 0xEA0)   &&
+#if defined(AM_ID_APOLLO5A)
+    if ( ( ui32PN == AM_UTIL_MCUCTRL_CHIP_INFO_PARTNUM_APOLLO5A)            &&
+              ((psIDDevice->sMcuCtrlDevice.ui32JedecPN & 0x0FF) == 0x0D2)   &&
+              ( revmaj_get(ui32ChipRev) == 'A' ) )
+    {
+        psIDDevice->ui32Device = AM_UTIL_ID_APOLLO5A;
+        psIDDevice->pui8DeviceName = g_DeviceNameApollo5a;
+        chiprev_set(psIDDevice, 1);
+    }
+#endif // AM_ID_APOLLO5A
+
+#if defined(AM_ID_APOLLO5B)
+        if ( ( ui32PN == AM_UTIL_MCUCTRL_CHIP_INFO_PARTNUM_APOLLO5B)            &&
+                  ((psIDDevice->sMcuCtrlDevice.ui32JedecPN & 0x0FF) == 0x0D2)   &&
                   ( revmaj_get(ui32ChipRev) == 'B' ) )
         {
-            psIDDevice->ui32Device     = AM_UTIL_ID_APOLLO510;
+            psIDDevice->ui32Device     = AM_UTIL_ID_APOLLO5B;
 
             //
             // One more check for radio version of Apollo510
             //
             psIDDevice->pui8DeviceName =
-                ((_FLD2VAL(MCUCTRL_CHIPPN_PKG, psIDDevice->sMcuCtrlDevice.ui32ChipPN) == MCUCTRL_CHIPPN_PKG_BGA) ||
-                 (_FLD2VAL(MCUCTRL_CHIPPN_PKG, psIDDevice->sMcuCtrlDevice.ui32ChipPN) == MCUCTRL_CHIPPN_PKG_CSP)) ?
+                _FLD2VAL(MCUCTRL_CHIPPN_PKG, psIDDevice->sMcuCtrlDevice.ui32ChipPN) >= 2 ?
                     g_DeviceNameApollo510   :
                     g_DeviceNameApollo510B;
+
             chiprev_set(psIDDevice, 1);
         }
-#endif // AM_ID_APOLLO510
+#endif // AM_ID_APOLLO5B
+
+#if defined(AM_ID_APOLLO510L)
+        if ( ( ui32PN == AM_UTIL_MCUCTRL_CHIP_INFO_PARTNUM_APOLLO510L)          &&
+                  ((psIDDevice->sMcuCtrlDevice.ui32JedecPN & 0x0FF) == 0x0D2)   &&
+                  ( revmaj_get(ui32ChipRev) == 'B' ) )
+        {
+            psIDDevice->ui32Device = AM_UTIL_ID_APOLLO510L;
+            psIDDevice->pui8DeviceName = g_DeviceNameApollo510L;
+            chiprev_set(psIDDevice, 1);
+        }
+#endif // AM_ID_APOLLO510L
+
     //
     // This section defines the package type
     //

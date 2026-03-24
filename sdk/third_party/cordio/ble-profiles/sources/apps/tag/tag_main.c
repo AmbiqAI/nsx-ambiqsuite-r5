@@ -341,7 +341,7 @@ static void tagDmCback(dmEvt_t *pDmEvt)
 
     if ((pMsg = WsfMsgAlloc(len)) != NULL)
     {
-      memcpy((uint8_t *)pMsg, (uint8_t *)pDmEvt, len);
+      memcpy(pMsg, pDmEvt, len);
       WsfMsgSend(tagCb.handlerId, pMsg);
     }
   }
@@ -362,7 +362,7 @@ static void tagAttCback(attEvt_t *pEvt)
 
   if ((pMsg = WsfMsgAlloc(sizeof(attEvt_t) + pEvt->valueLen)) != NULL)
   {
-    memcpy((uint8_t *)pMsg, (uint8_t *)pEvt, sizeof(attEvt_t));
+    memcpy(pMsg, pEvt, sizeof(attEvt_t));
     pMsg->pValue = (uint8_t *) (pMsg + 1);
     memcpy(pMsg->pValue, pEvt->pValue, pEvt->valueLen);
     WsfMsgSend(tagCb.handlerId, pMsg);
@@ -396,7 +396,7 @@ static void tagCccCback(attsCccEvt_t *pEvt)
 
   if ((pMsg = WsfMsgAlloc(sizeof(attsCccEvt_t))) != NULL)
   {
-    memcpy((uint8_t *)pMsg, (uint8_t *)pEvt, sizeof(attsCccEvt_t));
+    memcpy(pMsg, pEvt, sizeof(attsCccEvt_t));
     WsfMsgSend(tagCb.handlerId, pMsg);
   }
 }

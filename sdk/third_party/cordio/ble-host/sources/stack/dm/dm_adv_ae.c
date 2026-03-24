@@ -1214,7 +1214,7 @@ void dmExtAdvActHciEnableCmpl(hciEvt_t *pEvent)
   bool_t clearSets = FALSE;
   dmEvt_t dmMsg;
 
-  memcpy((uint8_t *)&dmMsg, (uint8_t *)&pEvent->hdr, sizeof(wsfMsgHdr_t));
+  memcpy(&dmMsg, &pEvent->hdr, sizeof(wsfMsgHdr_t));
   dmMsg.advSetStart.numSets = 0;
 
   for ( i= 0; i < DM_NUM_ADV_SETS; i++)
@@ -1454,7 +1454,7 @@ void dmPerAdvHciHandler(hciEvt_t *pEvent)
       dmEvt_t dmMsg;
 
       /* copy over event header */
-      memcpy((uint8_t *)&dmMsg, (uint8_t *)&pEvent->hdr, sizeof(wsfMsgHdr_t));
+      memcpy(&dmMsg, &pEvent->hdr, sizeof(wsfMsgHdr_t));
 
       switch (dmPerAdvCb[advHandle].advState)
       {

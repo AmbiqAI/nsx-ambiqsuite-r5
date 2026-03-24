@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -285,7 +285,6 @@ extern uint32_t am_devices_mspi_psram_write(void *pHandle,
                                             uint32_t ui32WriteAddress,
                                             uint32_t ui32NumBytes,
                                             bool bWaitForCompletion);
-
 
 //*****************************************************************************
 //

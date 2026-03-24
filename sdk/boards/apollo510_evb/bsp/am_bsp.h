@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -192,6 +192,8 @@ extern const am_hal_gpio_pincfg_t g_AM_VALIDATION_GPIO;
 //
 //*****************************************************************************
 #define AM_BSP_PWM_LED_TIMER                0
+#define AM_BSP_PWM_LED_TIMER_SEG            AM_HAL_CTIMER_TIMERB
+#define AM_BSP_PWM_LED_TIMER_INT            AM_HAL_CTIMER_INT_TIMERB0
 
 //*****************************************************************************
 //

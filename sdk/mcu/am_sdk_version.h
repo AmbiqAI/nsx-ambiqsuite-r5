@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef AM_SDK_VERSION_H
@@ -68,7 +68,7 @@ extern "C"
 #define AM_HAL_VERSION_MAJ      3
 #define AM_HAL_VERSION_MIN      2
 #define AM_HAL_VERSION_REV      0
-#elif defined(AM_PART_APOLLO4_API)
+#elif defined(AM_PART_APOLLO4_API) && !defined(AM_PART_BRONCO)
 #define AM_HAL_VERSION_MAJ      4
 #define AM_HAL_VERSION_MIN      5
 #define AM_HAL_VERSION_REV      0

@@ -2,11 +2,7 @@
 //
 //! @file am_util_bootloader.h
 //!
-//! @brief Bootloader Utility
-//!
-//! @addtogroup bootl Bootloader Utility
-//! @ingroup utils
-//! @{
+//! @brief
 //
 //*****************************************************************************
 
@@ -44,7 +40,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #include <stdint.h>
@@ -133,11 +129,3 @@ extern void am_util_bootloader_erase_flash_page(uint32_t ui32Addr);
 #endif
 
 #endif // AM_BOOTLOADER_H
-
-//*****************************************************************************
-//
-// End Doxygen group.
-//! @}
-//
-//*****************************************************************************
-

@@ -8,7 +8,7 @@
 //! that are not already covered by the HAL. Most of these commands either
 //! adjust RF settings or facilitate RF testing operations.
 //!
-//! @addtogroup ble BLE Utility
+//! @addtogroup ble BLE
 //! @ingroup utils
 //! @{
 //
@@ -48,7 +48,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 

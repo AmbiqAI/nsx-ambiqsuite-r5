@@ -8,7 +8,7 @@
 //! intended to be as unintrusive as possible and designed to be removed from
 //! the compilation of a project when they are no longer needed.
 //!
-//! @addtogroup debug Debug Utility
+//! @addtogroup debug Debug
 //! @ingroup utils
 //! @{
 //
@@ -48,7 +48,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef AM_UTIL_DEBUG_H

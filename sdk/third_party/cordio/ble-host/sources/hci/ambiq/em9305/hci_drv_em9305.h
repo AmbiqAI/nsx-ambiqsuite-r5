@@ -40,7 +40,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef HCI_DRV_EM9305_H
@@ -168,9 +168,7 @@ typedef struct{
 
 #define TX_POWER_LEVEL_DEFAULT TX_POWER_LEVEL_0P0_dBm
 
-#define TX_POWER_LEVEL_MIN_DBM  (-28)
 // Tx power level in dBm
-// Range: -28 to +6
 typedef enum
 {
   TX_POWER_LEVEL_MINUS_20P0_dBm = 0xEC,
@@ -181,7 +179,9 @@ typedef enum
   TX_POWER_LEVEL_PLUS_3P0_dBm   = 0x3,
   TX_POWER_LEVEL_PLUS_4P0_dBm   = 0x4,
   TX_POWER_LEVEL_PLUS_6P0_dBm   = 0x6,
-  TX_POWER_LEVEL_MAXIMUM        = TX_POWER_LEVEL_PLUS_6P0_dBm,
+  TX_POWER_LEVEL_PLUS_10P0_dBm  = 0xA,
+
+  TX_POWER_LEVEL_INVALID        = 0x15  // Range: -127 to +20
 }txPowerLevel_t;
 
 #define MIN_SWITCHING_PATTERN_LEN  (0x02)
@@ -208,7 +208,7 @@ typedef enum
 // Hci driver functions unique to EM9305
 //
 //*****************************************************************************
-bool_t HciVscSetRfPowerLevelEx(int8_t txPowerlevel);
+bool_t HciVscSetRfPowerLevelEx(txPowerLevel_t txPowerlevel);
 void   HciVscConstantTransmission(uint8_t txchannel);
 void   HciVscCarrierWaveMode(uint8_t txchannel);
 bool_t HciVscSetCustom_BDAddr(uint8_t *bd_addr);
@@ -220,7 +220,6 @@ extern void HciDrvHandlerInit(wsfHandlerId_t handlerId);
 extern void HciDrvIntService(void);
 extern void HciVscTransmitTestStart(hciVscStartTransTestCmd_t * transTestParam);
 extern void HciVscTransmitTestEnd(void);
-extern void HciDrvBleSleepSet(bool enable);
 #ifdef __cplusplus
 }
 #endif

@@ -221,7 +221,7 @@ l2cRegCb_t *l2cRegCbAlloc(l2cCocCback_t cback, l2cCocReg_t *pReg)
   {
     if (pCb->inUse == FALSE)
     {
-      memcpy((uint8_t *)&pCb->reg, (uint8_t *)pReg, sizeof(l2cCocReg_t));
+      memcpy(&pCb->reg, pReg, sizeof(l2cCocReg_t));
       pCb->cback = cback;
       pCb->acceptCback = l2cCocAcceptDefaultCb;
       pCb->regId = i + 1;

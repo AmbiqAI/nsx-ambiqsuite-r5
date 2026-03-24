@@ -171,7 +171,7 @@ void dcd_edpt_close_all       (uint8_t rhport);
 void dcd_edpt_close           (uint8_t rhport, uint8_t ep_addr) TU_ATTR_WEAK;
 
 // Submit a transfer, When complete dcd_event_xfer_complete() is invoked to notify the stack
-#if defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5B)
 bool dcd_edpt_xfer            (uint8_t rhport, uint8_t ep_addr, uint8_t * buffer, uint32_t total_bytes);
 #else
 bool dcd_edpt_xfer            (uint8_t rhport, uint8_t ep_addr, uint8_t * buffer, uint16_t total_bytes);

@@ -399,7 +399,7 @@ static uint8_t wdxsDcGetDeviceModel(dmConnId_t connId, uint16_t len, uint8_t *pV
 {
   uint8_t *p;
 
-  /* Add Device Model */
+  /* TODO: Add Device Model */
   char *pModelTxt = WDXS_DEVICE_MODEL;
 
   /* if update already waiting to be sent */
@@ -435,7 +435,7 @@ static uint8_t wdxsDcGetFirmwareRev(dmConnId_t connId, uint16_t len, uint8_t *pV
 {
   uint8_t *p;
 
-  /* Add Firmware Revision */
+  /* TODO: Add Firmware Revision */
   char *pFirmwareRev = "1.0";
 
   /* if update already waiting to be sent */

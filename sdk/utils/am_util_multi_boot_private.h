@@ -2,14 +2,8 @@
 //
 //! @file am_util_multi_boot_private.h
 //!
-//! This is a bootloader program that supports flash programming over UART,
-//! SPI, and I2C. The correct protocol is selected automatically at boot time.
+//! @brief Internal definitions/structures shared within multiboot
 //!
-//! SWO is configured in 1M baud, 8-n-1 mode.
-//!
-//! @addtogroup multi_boot Multi-Boot Protocol
-//! @ingroup utils
-//! @{
 //
 //*****************************************************************************
 
@@ -47,7 +41,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -212,11 +206,3 @@ extern void wipe_sram(void);
 #endif
 
 #endif // AM_MULTI_BOOT_PRIVATE_H
-
-//*****************************************************************************
-//
-// End Doxygen group.
-//! @}
-//
-//*****************************************************************************
-

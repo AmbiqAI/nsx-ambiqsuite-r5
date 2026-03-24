@@ -44,14 +44,12 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
 #ifndef AM_DEVICES_MSPI_PSRAM_APS25616BA_1P2V_H
 #define AM_DEVICES_MSPI_PSRAM_APS25616BA_1P2V_H
-
-#include "am_bsp.h"
 
 #ifdef __cplusplus
 extern "C"

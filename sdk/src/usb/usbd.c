@@ -1237,7 +1237,7 @@ bool usbd_edpt_release(uint8_t rhport, uint8_t ep_addr)
   return tu_edpt_release(ep_state, _usbd_mutex);
 }
 
-#if defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5B)
 bool usbd_edpt_xfer(uint8_t rhport, uint8_t ep_addr, uint8_t * buffer, uint32_t total_bytes)
 #else
 bool usbd_edpt_xfer(uint8_t rhport, uint8_t ep_addr, uint8_t * buffer, uint16_t total_bytes)

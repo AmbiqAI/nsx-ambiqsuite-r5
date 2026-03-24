@@ -8,7 +8,7 @@
 //! that are not already covered by the HAL. Most of these commands either
 //! adjust RF settings or facilitate RF testing operations.
 //!
-//! @addtogroup em9305_util EM9305 - BLE Functions
+//! @addtogroup EM9305 - BLE Functions
 //! @ingroup utils
 //! @{
 //
@@ -48,7 +48,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -103,32 +103,7 @@ extern uint32_t am_util_ble_sleep_set(void* pHandle, bool enable);
 //*****************************************************************************
 extern uint32_t am_util_ble_tx_power_set(void* pHandle, uint8_t ui32TxPower);
 
-//*****************************************************************************
-//
-//! @brief End test.
-//!
-//! @param pHandle - pointer to BLE Handle
-//! @param recvpackets - pointer for RX Packets
-//!
-//! @return Status Code
-//
-//*****************************************************************************
-uint32_t
-am_util_ble_end_test(void *pHandle, uint32_t *recvpackets);
 
-//*****************************************************************************
-//
-//! @brief To do directly transmit test where the DUT generates test reference
-//! packets at a fixed interval.
-//
-//! @param channel - Transmit channel, ranges 0x00 - 0x27
-//! @param test_data_len - Length of payload in each packet, range 0x00-0xFF
-//! @param pkt_payload -  Packet payload, ranges 0x00 - 0x07
-//!
-//! @return Status Code
-//
-//*****************************************************************************
-extern uint32_t am_util_ble_transmit_test(void *pHandle, uint8_t channel, uint8_t test_data_len, uint8_t pkt_payload);
 //*****************************************************************************
 //
 //! @brief to do directly output modulation signal.
@@ -150,12 +125,14 @@ extern uint32_t am_util_ble_trasmitter_test_ex(void *pHandle, uint8_t tx_test_mo
 //!
 //! @param pHandle - pointer to BLE Handle
 //! @param channel - channel number
+//! @param recvpackets - pointer for RX Packets
 //!
 //! @return Status Code
 //
 //*****************************************************************************
 extern uint32_t am_util_ble_receiver_test_ex(void *pHandle,
-                                             uint8_t channel);
+                                             uint8_t channel,
+                                             uint32_t *recvpackets);
 
 extern uint32_t am_util_ble_set_bd_addr(void *pHandle, uint8_t* bd_addr);
 extern uint32_t am_util_ble_get_w2pass_info(void *pHandle, char *info);

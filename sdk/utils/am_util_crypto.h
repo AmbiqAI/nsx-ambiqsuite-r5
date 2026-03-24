@@ -46,17 +46,15 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
 #ifndef AM_UTIL_CRYPTO_H
 #define AM_UTIL_CRYPTO_H
 
-#include <time.h>
-
 #if !defined(AM_PART_APOLLO4_API) && !defined(AM_PART_APOLLO5_API)
-#error "Error: am_util_crypto.h only supports Apollo4 and Apollo5."
+#error "Error: am_util_crypto.h only supports Apollo3 and Apollo4."
 #endif
 
 //
@@ -129,46 +127,6 @@ extern void am_util_crypto_exit(uint32_t exitCode);
 //
 //*****************************************************************************
 extern void am_util_crypto_abort(void);
-
-//*****************************************************************************
-//
-//! @brief Crypto Get Time for mbedtls libraries
-//!
-//! @note To be used with cryptocell library builds only. RTC structure should
-//!       be defined in code per crypto_self_test example
-//!
-//! @param time - pointer to time structure - will be unsued and is a carryover
-//!               from the library
-//!
-//! @return time_t - Calculated time in seconds since 1/1/1970 until current
-//!                  RTC time
-//
-//*****************************************************************************
-extern time_t am_util_crypto_get_time( time_t * time );
-
-//*****************************************************************************
-//
-//! @brief Crypto Set Ambiq RTC structure
-//!
-//! @note To be used with cryptocell library builds only
-//!
-//! Use this function to create a local structure in user code to pass for
-//! use in am_util_crypto_get_time
-//
-//*****************************************************************************
-extern void am_util_crypto_ambiq_time_structure_set(am_hal_rtc_time_t *atm);
-
-//*****************************************************************************
-//
-//! @brief Crypto Set gmtime structure
-//!
-//! @note To be used with cryptocell library builds only
-//!
-//! Use this function to create a local structure in user code to pass for
-//! use in am_util_crypto_get_time
-//
-//*****************************************************************************
-extern void am_util_crypto_gm_time_structure_set(struct tm *tm);
 
 #endif // AM_UTIL_CRYPTO_H
 

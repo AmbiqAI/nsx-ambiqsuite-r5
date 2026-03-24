@@ -286,7 +286,7 @@ static void medcDmCback(dmEvt_t *pDmEvt)
 
   if ((pMsg = WsfMsgAlloc(len + reportLen)) != NULL)
   {
-    memcpy((uint8_t *)pMsg, (uint8_t *)pDmEvt, len);
+    memcpy(pMsg, pDmEvt, len);
     if (pDmEvt->hdr.event == DM_SCAN_REPORT_IND)
     {
       pMsg->scanReport.pData = (uint8_t *) ((uint8_t *) pMsg + len);
@@ -311,7 +311,7 @@ static void medcAttCback(attEvt_t *pEvt)
 
   if ((pMsg = WsfMsgAlloc(sizeof(attEvt_t) + pEvt->valueLen)) != NULL)
   {
-    memcpy((uint8_t *)pMsg, (uint8_t *)pEvt, sizeof(attEvt_t));
+    memcpy(pMsg, pEvt, sizeof(attEvt_t));
     pMsg->pValue = (uint8_t *) (pMsg + 1);
     memcpy(pMsg->pValue, pEvt->pValue, pEvt->valueLen);
     WsfMsgSend(medcCb.handlerId, pMsg);

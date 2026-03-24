@@ -5,7 +5,7 @@
 //! @brief Functions for enabling and disabling power domains.
 //!
 //! @addtogroup pwrctrl4 PWRCTRL - Power Control
-//! @ingroup apollo510_hal
+//! @ingroup apollo5b_hal
 //! @{
 //
 //*****************************************************************************
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #include <stdint.h>
@@ -53,12 +53,26 @@
 #include "mcu/am_hal_sysctrl_ton_config.h"
 #include "mcu/am_hal_sysctrl_clk_mux_reset.h"
 
+static inline void vddc_vddf_tempco(am_hal_pwrctrl_tempco_range_e eTempCoRange);
+
+
 
 //*****************************************************************************
 //
 // Local defines
 //
 //*****************************************************************************
+//
+// The CORELDOACTIVETRIM trim code reduced in simobuck init
+//
+#define CORELDOACTIVETRIM_REDUCE_IN_SIMOBUCK_INIT          6
+
+//
+// The CORELDOACTIVETRIM trim code reduced in simobuck init for both
+// PCM1.1 (B0 trim version 3) and PCM2.0 (B1 trim version 1)
+//
+#define CORELDOACTIVETRIM_REDUCE_IN_SIMOBUCK_INIT_B0TRIM3_B1TRIM1  7
+
 //
 //! Maximum number of checks to memory power status before declaring error
 // (5 x 1usec = 5usec).
@@ -101,6 +115,11 @@
 #define AM_HAL_PWRCTRL_GPU_PWRON_WAIT    1
 
 #define CORE_SLEEP_DURATION              2  //in us
+
+//
+//! Maximum delay for waiting for timer AM_HAL_INTERNAL_TIMER_NUM_A is disabled
+//
+#define TIMER_A_DISABLE_WAIT_IN_US   2500
 
 void buck_ldo_update_override(bool bEnable);
 
@@ -148,21 +167,15 @@ uint32_t g_ui32VDDFBoostReqLevel2Cnt        = 0;
 //
 // ****************************************************************************
 bool     g_bOrigTrimsStored          = false;
-
-//*****************************************************************************
-// Temporarily suppress variable set but not used warnings
-//*****************************************************************************
-DIAG_SUPPRESS_SETNOTUSED_VAR
-
-uint32_t g_orig_TVRGCVREFTRIM               = 0;
-uint32_t g_orig_TVRGFVREFTRIM               = 0;
-uint32_t g_orig_VDDCLKGTRIM                 = 0;
-uint32_t g_orig_CORELDOTEMPCOTRIM           = 0;
-uint32_t g_orig_CORELDOACTIVETRIM           = 0;
 static uint32_t g_orig_ACTTRIMVDDF          = 0;
 static uint32_t g_orig_MEMLDOACTIVETRIM     = 0;
 static uint32_t g_orig_LPTRIMVDDF           = 0;
 static uint32_t g_orig_MEMLPLDOTRIM         = 0;
+static uint32_t g_orig_TVRGCVREFTRIM        = 0;
+static uint32_t g_orig_TVRGFVREFTRIM        = 0;
+static uint32_t g_orig_VDDCLKGTRIM          = 0;
+static uint32_t g_orig_CORELDOTEMPCOTRIM    = 0;
+static uint32_t g_orig_CORELDOACTIVETRIM    = 0;
 static uint32_t g_orig_D2ASPARE             = 0;
 static uint32_t g_orig_VDDCACTLOWTONTRIM    = 0;
 static uint32_t g_orig_VDDCACTHIGHTONTRIM   = 0;
@@ -171,9 +184,14 @@ static uint32_t g_orig_VDDCLVACTHIGHTONTRIM = 0;
 static uint32_t g_orig_VDDFACTLOWTONTRIM    = 0;
 static uint32_t g_orig_VDDFACTHIGHTONTRIM   = 0;
 
-DIAG_SUPPRESS_SETNOTUSED_VAR_DEFAULT
 //! @}
 
+static uint32_t g_ui32CurCORELDOTEMPCOTRIMLDO  = 0;
+static uint32_t g_ui32CurCORELDOTEMPCOTRIMBuck = 0;
+static uint32_t g_ui32CurMEMLDOACTIVETRIMLDO   = 0;
+static bool     g_bPostponeTempco              = false;
+static bool     g_bTempcoPending               = false;
+static am_hal_pwrctrl_tempco_range_e g_eTempCoRange = AM_HAL_PWRCTRL_TEMPCO_RANGE_LOW;
 extern uint8_t g_ui8TRCENAcount;    // am_hal_debug.c
 
 
@@ -641,8 +659,11 @@ mcu_hp_lp_switch_sequence(am_hal_pwrctrl_mcu_mode_e ePowerMode)
         //
         // Report CPU state change
         //
-        am_hal_spotmgr_cpu_state_e eCpuSt = AM_HAL_SPOTMGR_CPUSTATE_ACTIVE_HP;
-        am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_CPU_STATE, false, (void *) &eCpuSt);
+        if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+        {
+            am_hal_spotmgr_cpu_state_e eCpuSt = AM_HAL_SPOTMGR_CPUSTATE_ACTIVE_HP;
+            am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_CPU_STATE, false, (void *) &eCpuSt);
+        }
         // If HFRC2 is On - CPU clock is gated during the VDDC_LV to VDDF transition, as we want
         bool bHFRC2ForceOn = false;
         if (!CLKGEN->MISC_b.FRCHFRC2)
@@ -688,7 +709,6 @@ mcu_hp_lp_switch_sequence(am_hal_pwrctrl_mcu_mode_e ePowerMode)
             // Revert override
             CLKGEN->MISC_b.FRCHFRC2 = CLKGEN_MISC_FRCHFRC2_NOFRC;
         }
-        am_hal_spotmgr_post_lptohp_handle();
     }
     else
     {
@@ -719,8 +739,11 @@ mcu_hp_lp_switch_sequence(am_hal_pwrctrl_mcu_mode_e ePowerMode)
             //
             // Report CPU state change
             //
-            am_hal_spotmgr_cpu_state_e eCpuSt = AM_HAL_SPOTMGR_CPUSTATE_ACTIVE_LP;
-            am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_CPU_STATE, false, (void *) &eCpuSt);
+            if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+            {
+                am_hal_spotmgr_cpu_state_e eCpuSt = AM_HAL_SPOTMGR_CPUSTATE_ACTIVE_LP;
+                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_CPU_STATE, false, (void *) &eCpuSt);
+            }
         }
     }
     else
@@ -730,8 +753,11 @@ mcu_hp_lp_switch_sequence(am_hal_pwrctrl_mcu_mode_e ePowerMode)
             //
             // Need to revert the power state
             //
-            am_hal_spotmgr_cpu_state_e eCpuSt = AM_HAL_SPOTMGR_CPUSTATE_ACTIVE_LP;
-            am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_CPU_STATE, false, (void *) &eCpuSt);
+            if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+            {
+                am_hal_spotmgr_cpu_state_e eCpuSt = AM_HAL_SPOTMGR_CPUSTATE_ACTIVE_LP;
+                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_CPU_STATE, false, (void *) &eCpuSt);
+            }
         }
     }
 
@@ -777,6 +803,7 @@ am_hal_pwrctrl_mcu_mode_select(am_hal_pwrctrl_mcu_mode_e ePowerMode)
     {
         return AM_HAL_STATUS_INVALID_ARG;
     }
+#if !defined(APOLLO5_FPGA)
     //
     // We must be using SIMOBUCK in order to go to HP mode.
     //
@@ -785,6 +812,7 @@ am_hal_pwrctrl_mcu_mode_select(am_hal_pwrctrl_mcu_mode_e ePowerMode)
     {
         return AM_HAL_STATUS_INVALID_OPERATION;
     }
+#endif
 #endif // AM_HAL_DISABLE_API_VALIDATION
 
     //
@@ -870,6 +898,7 @@ am_hal_pwrctrl_gpu_mode_select(am_hal_pwrctrl_gpu_mode_e ePowerMode)
     }
 #endif // AM_HAL_DISABLE_API_VALIDATION
 
+#if !defined(APOLLO5_FPGA)
     //
     // We must be using SIMOBUCK in order to go to HP mode.
     //
@@ -878,6 +907,7 @@ am_hal_pwrctrl_gpu_mode_select(am_hal_pwrctrl_gpu_mode_e ePowerMode)
     {
         return AM_HAL_STATUS_INVALID_OPERATION;
     }
+#endif
 
     //
     // Check if GPU is already enabled.  If so, return an error code.
@@ -911,12 +941,15 @@ am_hal_pwrctrl_gpu_mode_select(am_hal_pwrctrl_gpu_mode_e ePowerMode)
     }
 
     AM_CRITICAL_BEGIN
-    //
-    //  If switching to HP Mode, change TON first before GPU Mode switching
-    //
-    if ( ePowerMode == AM_HAL_PWRCTRL_GPU_MODE_HIGH_PERFORMANCE )
+    if (APOLLO5_B0_LE_PCM0P7)
     {
-        am_hal_spotmgr_ton_config_update(true, ePowerMode);
+        //
+        //  If switching to HP Mode, change TON first before GPU Mode switching
+        //
+        if ( ePowerMode == AM_HAL_PWRCTRL_GPU_MODE_HIGH_PERFORMANCE )
+        {
+            am_hal_sysctrl_ton_config_update(true, ePowerMode);
+        }
     }
 
     //
@@ -944,13 +977,15 @@ am_hal_pwrctrl_gpu_mode_select(am_hal_pwrctrl_gpu_mode_e ePowerMode)
     // Wait for clock to settle.
     //
     am_hal_delay_us(AM_HAL_PWRCTRL_GPU_PWRADJ_WAIT);
-
-    //
-    //  If switching to LP Mode, change TON after GPU Mode switching is done
-    //
-    if ( ePowerMode == AM_HAL_PWRCTRL_GPU_MODE_LOW_POWER )
+    if (APOLLO5_B0_LE_PCM0P7)
     {
-        am_hal_spotmgr_ton_config_update(true, ePowerMode);
+        //
+        //  If switching to LP Mode, change TON after GPU Mode switching is done
+        //
+        if ( ePowerMode == AM_HAL_PWRCTRL_GPU_MODE_LOW_POWER )
+        {
+            am_hal_sysctrl_ton_config_update(true, ePowerMode);
+        }
     }
 
     AM_CRITICAL_END
@@ -1048,36 +1083,39 @@ am_hal_pwrctrl_mcu_memory_config(am_hal_pwrctrl_mcu_memory_config_t *psConfig)
     if (ui32PwrStatus != PWRCTRL->MEMPWRSTATUS)
     {
         //
-        // Calculate expected power status after writing memory disables.
+        // Report MEM power status
         //
-        ui32PwrStatusAfterDisables = PWRCTRL->MEMPWRSTATUS & ui32PwrStatus;
-
-        //
-        // Write memory disables firstly.
-        //
-        PWRCTRL->MEMPWREN &= ui32PwrEn;
-
-        //
-        // Wait for Status
-        //
-        ui32Status = am_hal_delay_us_status_check(AM_HAL_PWRCTRL_MAX_WAIT_US,
-                                                    (uint32_t)&PWRCTRL->MEMPWRSTATUS,
-                                                    AM_HAL_PWRCTRL_MEMPWRSTATUS_MASK,
-                                                    ui32PwrStatusAfterDisables,
-                                                    true);
-        //
-        // Check for timeout.
-        //
-        if (AM_HAL_STATUS_SUCCESS != ui32Status)
-        {
-            return ui32Status;
-        }
-        else
+        if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
         {
             //
-            // Report MEM power status
+            // Calculate expected power status after writing memory disables.
             //
-            am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_MEMPWR, true, (void *) &ui32PwrStatus);
+            ui32PwrStatusAfterDisables = PWRCTRL->MEMPWRSTATUS & ui32PwrStatus;
+
+            //
+            // Write memory disables firstly.
+            //
+            PWRCTRL->MEMPWREN &= ui32PwrEn;
+
+            //
+            // Wait for Status
+            //
+            ui32Status = am_hal_delay_us_status_check(AM_HAL_PWRCTRL_MAX_WAIT_US,
+                                                      (uint32_t)&PWRCTRL->MEMPWRSTATUS,
+                                                      AM_HAL_PWRCTRL_MEMPWRSTATUS_MASK,
+                                                      ui32PwrStatusAfterDisables,
+                                                      true);
+            //
+            // Check for timeout.
+            //
+            if (AM_HAL_STATUS_SUCCESS != ui32Status)
+            {
+                return ui32Status;
+            }
+            else
+            {
+                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_MEMPWR, true, (void *) &ui32PwrStatus);
+            }
         }
 
         PWRCTRL->MEMPWREN = ui32PwrEn;
@@ -1135,11 +1173,11 @@ am_hal_pwrctrl_mcu_memory_config(am_hal_pwrctrl_mcu_memory_config_t *psConfig)
     //
     if ( psConfig->eRetainDTCM == AM_HAL_PWRCTRL_MEMRETCFG_TCMPWDSLP_NORETAIN )
     {
-        PWRCTRL->MEMRETCFG_b.TCMPWDSLP = AM_HAL_PWRCTRL_MEMRETCFG_TCMPWDSLP_NORETAIN;
+        PWRCTRL->MEMRETCFG_b.TCMPWDSLP = PWRCTRL_MEMRETCFG_TCMPWDSLP_NORETAIN;
     }
     else if ( psConfig->eRetainDTCM == AM_HAL_PWRCTRL_MEMRETCFG_TCMPWDSLP_RETAIN )
     {
-        PWRCTRL->MEMRETCFG_b.TCMPWDSLP = AM_HAL_PWRCTRL_MEMRETCFG_TCMPWDSLP_RETAIN;
+        PWRCTRL->MEMRETCFG_b.TCMPWDSLP = PWRCTRL_MEMRETCFG_TCMPWDSLP_RETAIN;
     }
     else
     {
@@ -1180,11 +1218,11 @@ am_hal_pwrctrl_mcu_memory_config_get(am_hal_pwrctrl_mcu_memory_config_t *psConfi
     //
     // Configure the MCU Tightly Coupled Memory retention.
     //
-    if (PWRCTRL->MEMRETCFG_b.TCMPWDSLP == AM_HAL_PWRCTRL_MEMRETCFG_TCMPWDSLP_RETAIN)
+    if (PWRCTRL->MEMRETCFG_b.TCMPWDSLP == PWRCTRL_MEMRETCFG_TCMPWDSLP_RETAIN)
     {
         psConfig->eRetainDTCM = AM_HAL_PWRCTRL_MEMRETCFG_TCMPWDSLP_RETAIN;
     }
-    else if (PWRCTRL->MEMRETCFG_b.TCMPWDSLP == AM_HAL_PWRCTRL_MEMRETCFG_TCMPWDSLP_NORETAIN)
+    else if (PWRCTRL->MEMRETCFG_b.TCMPWDSLP == PWRCTRL_MEMRETCFG_TCMPWDSLP_NORETAIN)
     {
         psConfig->eRetainDTCM = AM_HAL_PWRCTRL_MEMRETCFG_TCMPWDSLP_NORETAIN;
     }
@@ -1212,8 +1250,11 @@ am_hal_pwrctrl_rom_enable(void)
         //
         // Report rom power change
         //
-        uint32_t ui32MemSt = PWRCTRL_MEMPWRSTATUS_PWRSTROM_Msk | PWRCTRL->MEMPWRSTATUS;
-        am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_MEMPWR, true, (void *) &ui32MemSt);
+        if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+        {
+            uint32_t ui32MemSt = PWRCTRL_MEMPWRSTATUS_PWRSTROM_Msk | PWRCTRL->MEMPWRSTATUS;
+            am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_MEMPWR, true, (void *) &ui32MemSt);
+        }
 
         PWRCTRL->MEMPWREN_b.PWRENROM = PWRCTRL_MEMPWREN_PWRENROM_EN;
 
@@ -1276,8 +1317,11 @@ am_hal_pwrctrl_rom_disable(void)
         //
         // Report rom power change
         //
-        uint32_t ui32MemSt = PWRCTRL->MEMPWRSTATUS;
-        am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_MEMPWR, false, (void *) &ui32MemSt);
+        if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+        {
+            uint32_t ui32MemSt = PWRCTRL->MEMPWRSTATUS;
+            am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_MEMPWR, false, (void *) &ui32MemSt);
+        }
     }
 
     return AM_HAL_STATUS_SUCCESS;
@@ -1313,19 +1357,21 @@ am_hal_pwrctrl_sram_config(am_hal_pwrctrl_sram_memcfg_t *psConfig)
         // So it works to determine if any new SSRAM is being enabled by checking
         // if psConfig->eSRAMCfg > PWRCTRL->SSRAMPWRST_b.SSRAMPWRST.
         //
-        if (psConfig->eSRAMCfg > PWRCTRL->SSRAMPWRST_b.SSRAMPWRST)
+        if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
         {
-            //
-            // Report SSRAM power change
-            //
-            am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_SSRAMPWR, true, (void *) &(psConfig->eSRAMCfg));
-            bUpdateLater = false;
+            if (psConfig->eSRAMCfg > PWRCTRL->SSRAMPWRST_b.SSRAMPWRST)
+            {
+                //
+                // Report SSRAM power change
+                //
+                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_SSRAMPWR, true, (void *) &(psConfig->eSRAMCfg));
+                bUpdateLater = false;
+            }
+            else // sConfig->eSRAMCfg < PWRCTRL->SSRAMPWRST_b.SSRAMPWRST
+            {
+                bUpdateLater = true;
+            }
         }
-        else // sConfig->eSRAMCfg < PWRCTRL->SSRAMPWRST_b.SSRAMPWRST
-        {
-            bUpdateLater = true;
-        }
-
         //
         // Configure the Shared RAM.
         //
@@ -1357,13 +1403,15 @@ am_hal_pwrctrl_sram_config(am_hal_pwrctrl_sram_memcfg_t *psConfig)
         {
             return AM_HAL_STATUS_FAIL;
         }
-
-        if (bUpdateLater)
+        if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
         {
-            //
-            // Report SSRAM power change
-            //
-            am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_SSRAMPWR, false, NULL);
+            if (bUpdateLater)
+            {
+                //
+                // Report SSRAM power change
+                //
+                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_SSRAMPWR, false, NULL);
+            }
         }
         DIAG_DEFAULT_VOLATILE_ORDER()
     }
@@ -1508,6 +1556,327 @@ crypto_quiesce(void)
 
 // ****************************************************************************
 //
+//  Internal function for SIMOBUCK on/off
+//
+// ****************************************************************************
+static inline void
+simobuck_enable(bool bEnable)
+{
+    if (bEnable)
+    {
+        //
+        // Enable the simobuck
+        //
+        PWRCTRL->VRCTRL_b.SIMOBUCKEN = 1;
+        am_hal_delay_us(5);
+        buck_ldo_update_override(true);
+    }
+    else
+    {
+        //
+        // Disable the simobuck
+        //
+        buck_ldo_update_override(false);
+        am_hal_delay_us(5);
+        PWRCTRL->VRCTRL_b.SIMOBUCKEN = 0;
+    }
+}
+
+// ****************************************************************************
+//
+//  gpu_on_sequence()
+//
+// ****************************************************************************
+static inline void
+gpu_on_sequence(void)
+{
+    am_hal_clkmgr_clock_request(AM_HAL_CLKMGR_CLK_ID_HFRC, AM_HAL_CLKMGR_USER_ID_GFX);
+    if (g_eCurGpuPwrMode == AM_HAL_PWRCTRL_GPU_MODE_HIGH_PERFORMANCE)
+    {
+        am_hal_clkmgr_clock_request(AM_HAL_CLKMGR_CLK_ID_HFRC2, AM_HAL_CLKMGR_USER_ID_GFX);
+    }
+
+    if (APOLLO5_B0_GE_PCM0P7 || APOLLO5_B1_LE_PCM2P0 || APOLLO5_B2_PCM2P0)
+    {
+        if (PWRCTRL->VRSTATUS_b.SIMOBUCKST == PWRCTRL_VRSTATUS_SIMOBUCKST_ACT) // Buck mode
+        {
+            if (APOLLO5_B0_PCM0P7)
+            {
+                if (g_bOrigTrimsStored)
+                {
+                    //
+                    // Disable the simobuck
+                    //
+                    simobuck_enable(false);
+                    //
+                    // coreldo boost
+                    //
+                    MCUCTRL->LDOREG1_b.CORELDOTEMPCOTRIM = 1;
+                    //
+                    // Simobuck VDDC boost
+                    //
+                    FINAL_VAL_OVF_CAP_BASE(g_orig_TVRGCVREFTRIM, 9, MCUCTRL, VREFGEN2, TVRGCVREFTRIM);
+                    //
+                    // Simobuck VDDC boost
+                    //
+                    MCUCTRL->D2ASPARE_b.D2ASPARE |= (0x1UL << 8);
+                    //
+                    // Simobuck VDDF and memldo boost
+                    //
+                    FINAL_VAL_OVF_CAP_BASE(g_orig_TVRGFVREFTRIM, 15, MCUCTRL, VREFGEN4, TVRGFVREFTRIM);
+                    //
+                    // Adjust the simobuck Ton gen clock to compensate for the VDDC boost
+                    //
+                    MCUCTRL->SIMOBUCK14_b.VDDCLKGTRIM = 3;
+                    //
+                    // Enable the simobuck
+                    //
+                    simobuck_enable(true);
+                    //
+                    // Delay 20us for VDDC and VDDF to boost
+                    //
+                    am_hal_delay_us(15);
+                }
+            }
+            else // for B0 PCM1.0 and later trim, B1 PCM2.0 and previous trim
+            {
+                int32_t i32CORELDODiff;
+                //
+                // coreldo boost
+                //
+                g_ui32CurCORELDOTEMPCOTRIMBuck = MCUCTRL->LDOREG1_b.CORELDOTEMPCOTRIM;
+                MCUCTRL->LDOREG1_b.CORELDOTEMPCOTRIM = 1;
+                DIFF_OVF_CAP(i32CORELDODiff, 12, MCUCTRL, LDOREG1, CORELDOACTIVETRIM);
+                MCUCTRL->LDOREG1_b.CORELDOACTIVETRIM += i32CORELDODiff;
+                //
+                // memldo boost
+                //
+                MCUCTRL->LDOREG2_b.MEMLDOACTIVETRIM = 5;
+                //
+                // Delay 5us
+                //
+                am_hal_delay_us(5);
+                //
+                // VDDF boost
+                //
+                FINAL_VAL_OVF_CAP(15, MCUCTRL, VREFGEN4, TVRGFVREFTRIM);
+                //
+                // Short VDDC to VDDC_LV and VDDS to VDDF
+                //
+                vddc_to_vddclv_and_vdds_to_vddf_short(true);
+                //
+                // Delay 10us
+                //
+                am_hal_delay_us(10);
+                //
+                // VDDC boost
+                //
+                FINAL_VAL_OVF_CAP(9, MCUCTRL, VREFGEN2, TVRGCVREFTRIM );
+                MCUCTRL->D2ASPARE_b.D2ASPARE |= (0x1UL << 8);
+                //
+                // VDDC and VDDCLV Ton updates
+                //
+                MCUCTRL->SIMOBUCK2_b.VDDCACTLOWTONTRIM = 10;
+                MCUCTRL->SIMOBUCK2_b.VDDCACTHIGHTONTRIM = 10;
+                MCUCTRL->SIMOBUCK4_b.VDDCLVACTLOWTONTRIM = 8;
+                MCUCTRL->SIMOBUCK4_b.VDDCLVACTHIGHTONTRIM = 8;
+                //
+                // VDDF Ton updates
+                //
+                if (g_eCurGpuPwrMode == AM_HAL_PWRCTRL_GPU_MODE_LOW_POWER)
+                {
+                    MCUCTRL->SIMOBUCK7_b.VDDFACTLOWTONTRIM = 16;
+                    MCUCTRL->SIMOBUCK6_b.VDDFACTHIGHTONTRIM = 20;
+                }
+                else
+                {
+                    MCUCTRL->SIMOBUCK7_b.VDDFACTLOWTONTRIM = 20;
+                    MCUCTRL->SIMOBUCK6_b.VDDFACTHIGHTONTRIM = 22;
+                }
+                //
+                // Remove VDDC and VDDC_LV short and VDDS to VDDF
+                //
+                vddc_to_vddclv_and_vdds_to_vddf_short(false);
+                //
+                // Reduce coreldo
+                //
+                MCUCTRL->LDOREG1_b.CORELDOACTIVETRIM -= i32CORELDODiff;
+                //
+                // Reduce memldo
+                //
+                if ( APOLLO5_B0_GE_PCM1P1 || APOLLO5_B1_PCM2P0 || APOLLO5_B2_PCM2P0 )
+                {
+                    MCUCTRL->LDOREG2_b.MEMLDOACTIVETRIM = 1;
+                }
+                else
+                {
+                    MCUCTRL->LDOREG2_b.MEMLDOACTIVETRIM = 0;
+                }
+            }
+        }
+        else // LDO mode
+        {
+            //
+            // coreldo boost
+            //
+            g_ui32CurCORELDOTEMPCOTRIMLDO = MCUCTRL->LDOREG1_b.CORELDOTEMPCOTRIM;
+            MCUCTRL->LDOREG1_b.CORELDOTEMPCOTRIM = 2;
+            //
+            // memldo boost
+            //
+            g_ui32CurMEMLDOACTIVETRIMLDO = MCUCTRL->LDOREG2_b.MEMLDOACTIVETRIM;
+            FINAL_VAL_OVF_CAP(5, MCUCTRL, LDOREG2, MEMLDOACTIVETRIM);
+            //
+            // Delay 15us for coreldo and memldo to boost
+            //
+            am_hal_delay_us(15);
+        }
+    }
+    else // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+    {
+        //
+        // Report GPU state change
+        //
+        am_hal_spotmgr_gpu_state_e eGpuSt;
+        if (g_eCurGpuPwrMode == AM_HAL_PWRCTRL_GPU_MODE_LOW_POWER)
+        {
+            eGpuSt = AM_HAL_SPOTMGR_GPUSTATE_ACTIVE_LP;
+        }
+        else
+        {
+            eGpuSt = AM_HAL_SPOTMGR_GPUSTATE_ACTIVE_HP;
+        }
+        am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_GPU_STATE, true, (void *) &eGpuSt);
+    }
+} // gpu_on_sequence()
+
+// ****************************************************************************
+//
+//  gpu_off_sequence()
+//
+// ****************************************************************************
+static inline void
+gpu_off_sequence(void)
+{
+    if (APOLLO5_B0_GE_PCM0P7 || APOLLO5_B1_LE_PCM2P0 || APOLLO5_B2_PCM2P0)
+    {
+        if (PWRCTRL->VRSTATUS_b.SIMOBUCKST == PWRCTRL_VRSTATUS_SIMOBUCKST_ACT) // Buck mode
+        {
+            if (APOLLO5_B0_PCM0P7)
+            {
+                if (g_bOrigTrimsStored)
+                {
+                    //
+                    // Disable the simobuck
+                    //
+                    simobuck_enable(false);
+                    //
+                    // Set back to original value
+                    //
+                    MCUCTRL->SIMOBUCK14_b.VDDCLKGTRIM = g_orig_VDDCLKGTRIM;
+                    //
+                    // Set back to original value
+                    //
+                    MCUCTRL->VREFGEN4_b.TVRGFVREFTRIM = g_orig_TVRGFVREFTRIM;
+                    //
+                    // Set back to original value
+                    //
+                    MCUCTRL->D2ASPARE_b.D2ASPARE &= ~(0x1UL << 8);
+                    //
+                    // Set back to original value
+                    //
+                    MCUCTRL->VREFGEN2_b.TVRGCVREFTRIM = g_orig_TVRGCVREFTRIM;
+                    //
+                    // Set back to original value
+                    //
+                    MCUCTRL->LDOREG1_b.CORELDOTEMPCOTRIM = g_orig_CORELDOTEMPCOTRIM;
+                    //
+                    // Enable the simobuck
+                    //
+                    simobuck_enable(true);
+                }
+            }
+            else // for B0 PCM1.0 and later trim, B1 PCM2.0 and previous trim
+            {
+                int32_t i32CORELDODiff;
+                //
+                // coreldo boost
+                //
+                DIFF_OVF_CAP(i32CORELDODiff, 12, MCUCTRL, LDOREG1, CORELDOACTIVETRIM);
+                MCUCTRL->LDOREG1_b.CORELDOACTIVETRIM += i32CORELDODiff;
+                //
+                // memldo boost
+                //
+                MCUCTRL->LDOREG2_b.MEMLDOACTIVETRIM = 5;
+                //
+                // Delay 5us
+                //
+                am_hal_delay_us(5);
+                //
+                // Short VDDC to VDDC_LV and VDDS to VDDF
+                //
+                vddc_to_vddclv_and_vdds_to_vddf_short(true);
+                //
+                // Delay 10us
+                //
+                am_hal_delay_us(10);
+                //
+                // Ton updates
+                //
+                MCUCTRL->SIMOBUCK2_b.VDDCACTLOWTONTRIM = 6;
+                MCUCTRL->SIMOBUCK2_b.VDDCACTHIGHTONTRIM = 6;
+                MCUCTRL->SIMOBUCK4_b.VDDCLVACTLOWTONTRIM = 5;
+                MCUCTRL->SIMOBUCK4_b.VDDCLVACTHIGHTONTRIM = 5;
+                MCUCTRL->SIMOBUCK7_b.VDDFACTLOWTONTRIM = 7;
+                MCUCTRL->SIMOBUCK6_b.VDDFACTHIGHTONTRIM = 10;
+                //
+                // Restore power trims
+                //
+                FINAL_VAL_UDF_CAP(15, MCUCTRL, VREFGEN4, TVRGFVREFTRIM);
+                FINAL_VAL_UDF_CAP(9, MCUCTRL, VREFGEN2, TVRGCVREFTRIM);
+                MCUCTRL->LDOREG1_b.CORELDOTEMPCOTRIM = g_ui32CurCORELDOTEMPCOTRIMBuck;
+                MCUCTRL->D2ASPARE_b.D2ASPARE &= ~(0x1UL << 8);
+                MCUCTRL->LDOREG1_b.CORELDOACTIVETRIM -= i32CORELDODiff;
+                if ( APOLLO5_B0_GE_PCM1P1 || APOLLO5_B1_PCM2P0 || APOLLO5_B2_PCM2P0 )
+                {
+                    MCUCTRL->LDOREG2_b.MEMLDOACTIVETRIM = 1;
+                }
+                else
+                {
+                    MCUCTRL->LDOREG2_b.MEMLDOACTIVETRIM = 0;
+                }
+                //
+                // Remove VDDC and VDDC_LV short and VDDS to VDDF
+                //
+                vddc_to_vddclv_and_vdds_to_vddf_short(false);
+            }
+        }
+        else // LDO mode
+        {
+            //
+            // Set back to original value
+            //
+            MCUCTRL->LDOREG2_b.MEMLDOACTIVETRIM = g_ui32CurMEMLDOACTIVETRIMLDO;
+            //
+            // Set back to original value
+            //
+            MCUCTRL->LDOREG1_b.CORELDOTEMPCOTRIM = g_ui32CurCORELDOTEMPCOTRIMLDO;
+        }
+    }
+    else // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+    {
+        //
+        // Report GPU state change
+        //
+        am_hal_spotmgr_gpu_state_e eGpuSt = AM_HAL_SPOTMGR_GPUSTATE_OFF;
+        am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_GPU_STATE, true, (void *) &eGpuSt);
+    }
+
+    am_hal_clkmgr_clock_release_all(AM_HAL_CLKMGR_USER_ID_GFX);
+} // gpu_off_sequence()
+
+// ****************************************************************************
+//
 //  am_hal_pwrctrl_periph_enable()
 //  Enable power for a peripheral.
 //
@@ -1542,69 +1911,111 @@ am_hal_pwrctrl_periph_enable(am_hal_pwrctrl_periph_e ePeripheral)
         return AM_HAL_STATUS_FAIL;
     }
 
-    //
-    // Postpone Tempco for PCM2.0
-    //
-    am_hal_spotmgr_tempco_postpone();
-
-    //
-    // For GPU enable, execute GPU power on sequence
-    //
-    if (ePeripheral == AM_HAL_PWRCTRL_PERIPH_GFX)
+    if (APOLLO5_B0_LE_PCM0P7)
     {
-        am_hal_spotmgr_gpu_state_e eGpuSt;
-
-        if (g_ePreGpuPwrMode == AM_HAL_PWRCTRL_GPU_MODE_HIGH_PERFORMANCE)
+        //
+        // Switch GPU to the previous mode or desired mode
+        //
+        AM_CRITICAL_BEGIN
+        if (ePeripheral == AM_HAL_PWRCTRL_PERIPH_GFX)
         {
-            am_hal_pwrctrl_gpu_mode_select(AM_HAL_PWRCTRL_GPU_MODE_HIGH_PERFORMANCE);
-        }
+            if (g_ePreGpuPwrMode == AM_HAL_PWRCTRL_GPU_MODE_HIGH_PERFORMANCE)
+            {
+                am_hal_pwrctrl_gpu_mode_select(AM_HAL_PWRCTRL_GPU_MODE_HIGH_PERFORMANCE);
+            }
+            else
+            {
+                am_hal_sysctrl_ton_config_update(true, AM_HAL_PWRCTRL_GPU_MODE_LOW_POWER);
+            }
 
-        am_hal_clkmgr_clock_request(AM_HAL_CLKMGR_CLK_ID_HFRC, AM_HAL_CLKMGR_USER_ID_GFX);
-        if (g_eCurGpuPwrMode == AM_HAL_PWRCTRL_GPU_MODE_HIGH_PERFORMANCE)
-        {
-            am_hal_clkmgr_clock_request(AM_HAL_CLKMGR_CLK_ID_HFRC2, AM_HAL_CLKMGR_USER_ID_GFX);
+            //
+            // GPU power on sequences
+            //
+            gpu_on_sequence();
         }
 
         //
-        // Report GPU state change to SPOTmanager
+        // Enable power control for the given device.
         //
-        if (g_eCurGpuPwrMode == AM_HAL_PWRCTRL_GPU_MODE_LOW_POWER)
+        AM_REGVAL(pwr_ctrl.ui32PwrEnRegAddr) |=
+            pwr_ctrl.ui32PeriphEnable;
+        AM_CRITICAL_END
+    }
+    else if ( APOLLO5_B0_GE_PCM1P0 || APOLLO5_B1_LE_PCM2P0 || APOLLO5_B2_PCM2P0 )
+    {
+        if (ePeripheral == AM_HAL_PWRCTRL_PERIPH_GFX)
         {
-            eGpuSt = AM_HAL_SPOTMGR_GPUSTATE_ACTIVE_LP;
+            g_bPostponeTempco = true;
+            if (g_ePreGpuPwrMode == AM_HAL_PWRCTRL_GPU_MODE_HIGH_PERFORMANCE)
+            {
+                am_hal_pwrctrl_gpu_mode_select(AM_HAL_PWRCTRL_GPU_MODE_HIGH_PERFORMANCE);
+            }
+
+            //
+            // GPU power on sequences
+            //
+            gpu_on_sequence();
+            AM_CRITICAL_BEGIN
+            AM_REGVAL(pwr_ctrl.ui32PwrEnRegAddr) |=
+                pwr_ctrl.ui32PeriphEnable;
+            if (g_bTempcoPending)
+            {
+                vddc_vddf_tempco(g_eTempCoRange);
+                g_bTempcoPending  = false;
+            }
+            g_bPostponeTempco = false;
+            AM_CRITICAL_END
         }
         else
         {
-            eGpuSt = AM_HAL_SPOTMGR_GPUSTATE_ACTIVE_HP;
+            //
+            // Enable power control for the given device.
+            //
+            AM_CRITICAL_BEGIN
+            AM_REGVAL(pwr_ctrl.ui32PwrEnRegAddr) |=
+                pwr_ctrl.ui32PeriphEnable;
+            AM_CRITICAL_END
         }
-        am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_GPU_STATE, true, (void *) &eGpuSt);
     }
-    else
+    else // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2
     {
         //
-        // Update power state
+        // Switch GPU to the previous mode or desired mode
         //
-        if ( (pwr_ctrl.ui32PeriphEnable & DEVPWRST_MONITOR_PERIPH_MASK) && (ePeripheral < AM_HAL_PWRCTRL_PERIPH_PDM0) )
+        if (ePeripheral == AM_HAL_PWRCTRL_PERIPH_GFX)
         {
-            am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_DEVPWR, true, (void *) &(pwr_ctrl.ui32PeriphStatus));
+            if (g_ePreGpuPwrMode == AM_HAL_PWRCTRL_GPU_MODE_HIGH_PERFORMANCE)
+            {
+                am_hal_pwrctrl_gpu_mode_select(AM_HAL_PWRCTRL_GPU_MODE_HIGH_PERFORMANCE);
+            }
+
+            //
+            // GPU power on sequences
+            //
+            gpu_on_sequence();
         }
-        if ( (pwr_ctrl.ui32PeriphEnable & AUDSSPWRST_MONITOR_PERIPH_MASK) && (ePeripheral >= AM_HAL_PWRCTRL_PERIPH_PDM0) )
+        else
         {
-            am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_AUDSSPWR, true, (void *) &(pwr_ctrl.ui32PeriphStatus));
+            //
+            // Update power state
+            //
+            if ( (pwr_ctrl.ui32PeriphEnable & DEVPWRST_MONITOR_PERIPH_MASK) && (ePeripheral < AM_HAL_PWRCTRL_PERIPH_PDM0) )
+            {
+                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_DEVPWR, true, (void *) &(pwr_ctrl.ui32PeriphStatus));
+            }
+            if ( (pwr_ctrl.ui32PeriphEnable & AUDSSPWRST_MONITOR_PERIPH_MASK) && (ePeripheral >= AM_HAL_PWRCTRL_PERIPH_PDM0) )
+            {
+                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_AUDSSPWR, true, (void *) &(pwr_ctrl.ui32PeriphStatus));
+            }
         }
+        AM_CRITICAL_BEGIN
+        //
+        // Enable power control for the given device.
+        //
+        AM_REGVAL(pwr_ctrl.ui32PwrEnRegAddr) |=
+            pwr_ctrl.ui32PeriphEnable;
+        AM_CRITICAL_END
     }
-
-    AM_CRITICAL_BEGIN
-    //
-    // Enable power control for the given device.
-    //
-    AM_REGVAL(pwr_ctrl.ui32PwrEnRegAddr) |=
-        pwr_ctrl.ui32PeriphEnable;
-    AM_CRITICAL_END
-
-    //
-    // Handle pending tempco operation if any
-    //
-    am_hal_spotmgr_tempco_pending_handle();
 
     ui32Status = am_hal_delay_us_status_check(AM_HAL_PWRCTRL_MAX_WAIT_US,
                                               pwr_ctrl.ui32PwrStatReqAddr,
@@ -1809,18 +2220,82 @@ am_hal_pwrctrl_periph_disable(am_hal_pwrctrl_periph_e ePeripheral)
         MCUCTRL->DBGCTRL_b.DBGTPIUCLKSEL      = MCUCTRL_DBGCTRL_DBGTPIUCLKSEL_OFF;
     }
 
-    //
-    // Postpone Tempco for PCM2.0
-    //
-    am_hal_spotmgr_tempco_postpone();
+    if (APOLLO5_B0_LE_PCM0P7)
+    {
+        AM_CRITICAL_BEGIN
+
+        //
+        // Disable power domain for the given device.
+        //
+        AM_REGVAL(pwr_ctrl.ui32PwrEnRegAddr) &= ~pwr_ctrl.ui32PeriphEnable;
+
+        //
+        // Switch GPU to LP when powering down GPU.
+        //
+        if (ePeripheral == AM_HAL_PWRCTRL_PERIPH_GFX)
+        {
+            //
+            // GPU power off sequences
+            //
+            gpu_off_sequence();
+
+            //
+            // Update TON configuration after GPU is done turned off
+            //
+            am_hal_sysctrl_ton_config_update(false, AM_HAL_PWRCTRL_GPU_MODE_LOW_POWER);
+        }
+        AM_CRITICAL_END
+    }
+    else if ( APOLLO5_B0_GE_PCM1P0 || APOLLO5_B1_LE_PCM2P0 || APOLLO5_B2_PCM2P0 )
+    {
+        //
+        // Switch GPU to LP when powering down GPU.
+        //
+        if (ePeripheral == AM_HAL_PWRCTRL_PERIPH_GFX)
+        {
+            g_bPostponeTempco = true;
+            //
+            // Disable power domain for the given device.
+            //
+            AM_CRITICAL_BEGIN
+            AM_REGVAL(pwr_ctrl.ui32PwrEnRegAddr) &= ~pwr_ctrl.ui32PeriphEnable;
+            AM_CRITICAL_END
+            //
+            // GPU power off sequences
+            //
+            gpu_off_sequence();
+            AM_CRITICAL_BEGIN
+            if (g_bTempcoPending)
+            {
+                vddc_vddf_tempco(g_eTempCoRange);
+                g_bTempcoPending  = false;
+            }
+            g_bPostponeTempco = false;
+            AM_CRITICAL_END
+        }
+        else
+        {
+            //
+            // Disable power domain for the given device.
+            //
+            AM_CRITICAL_BEGIN
+            AM_REGVAL(pwr_ctrl.ui32PwrEnRegAddr) &= ~pwr_ctrl.ui32PeriphEnable;
+            AM_CRITICAL_END
+        }
+    }
+    else  // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+    {
+        AM_CRITICAL_BEGIN
+
+        //
+        // Disable power domain for the given device.
+        //
+        AM_REGVAL(pwr_ctrl.ui32PwrEnRegAddr) &= ~pwr_ctrl.ui32PeriphEnable;
+
+        AM_CRITICAL_END
+    }
 
     //
-    // Disable power domain for the given device.
-    //
-    AM_CRITICAL_BEGIN
-    AM_REGVAL(pwr_ctrl.ui32PwrEnRegAddr) &= ~pwr_ctrl.ui32PeriphEnable;
-    AM_CRITICAL_END
-
     // When disabling the last peripheral in a power domain, do power status check.
     // When there are more than one enable in the same domain is set and the user
     // tries to disable only one, return AM_HAL_STATUS_SUCCESS.
@@ -1851,8 +2326,6 @@ am_hal_pwrctrl_periph_disable(am_hal_pwrctrl_periph_e ePeripheral)
             //
             if (ePeripheral == AM_HAL_PWRCTRL_PERIPH_GFX)
             {
-                am_hal_spotmgr_gpu_state_e eGpuSt = AM_HAL_SPOTMGR_GPUSTATE_OFF;
-
                 if (g_eCurGpuPwrMode == AM_HAL_PWRCTRL_GPU_MODE_HIGH_PERFORMANCE)
                 {
                     am_hal_pwrctrl_gpu_mode_select(AM_HAL_PWRCTRL_GPU_MODE_LOW_POWER);
@@ -1863,39 +2336,38 @@ am_hal_pwrctrl_periph_disable(am_hal_pwrctrl_periph_e ePeripheral)
                     g_ePreGpuPwrMode = AM_HAL_PWRCTRL_GPU_MODE_LOW_POWER;
                 }
 
-                //
-                // Report GPU state change to SPOTmanager
-                //
-                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_GPU_STATE, true, (void *) &eGpuSt);
-
-                //
-                // Release GPU clocks to clock manager
-                //
-                am_hal_clkmgr_clock_release_all(AM_HAL_CLKMGR_USER_ID_GFX);
+                if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+                {
+                    //
+                    // GPU power off sequences
+                    //
+                    gpu_off_sequence();
+                }
             }
             else
             {
-                //
-                // Update power state
-                //
-                if ((ePeripheral < AM_HAL_PWRCTRL_PERIPH_PDM0) && (pwr_ctrl.ui32PeriphEnable & DEVPWRST_MONITOR_PERIPH_MASK))
+                if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
                 {
-                    am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_DEVPWR, false, (void *) &(pwr_ctrl.ui32PeriphStatus));
-                }
-                if ((ePeripheral >= AM_HAL_PWRCTRL_PERIPH_PDM0) && (pwr_ctrl.ui32PeriphEnable & AUDSSPWRST_MONITOR_PERIPH_MASK))
-                {
-                    am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_AUDSSPWR, false, (void *) &(pwr_ctrl.ui32PeriphStatus));
+                    //
+                    // Update power state
+                    //
+                    if ( (pwr_ctrl.ui32PeriphEnable & DEVPWRST_MONITOR_PERIPH_MASK) && (ePeripheral < AM_HAL_PWRCTRL_PERIPH_PDM0) )
+                    {
+                        am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_DEVPWR, false, NULL);
+                    }
+                    if ( (pwr_ctrl.ui32PeriphEnable & AUDSSPWRST_MONITOR_PERIPH_MASK) && (ePeripheral >= AM_HAL_PWRCTRL_PERIPH_PDM0) )
+                    {
+                        am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_AUDSSPWR, false, NULL);
+                    }
                 }
             }
         }
+        return ui32Status;
     }
-
-    //
-    // Handle pending tempco operation if any
-    //
-    am_hal_spotmgr_tempco_pending_handle();
-
-    return ui32Status;
+    else
+    {
+        return AM_HAL_STATUS_SUCCESS;
+    }
 
 } // am_hal_pwrctrl_periph_disable()
 
@@ -2000,7 +2472,7 @@ static uint32_t
 pwrctrl_INFO1_populate(void)
 {
     //
-    // To optimize power, we'll capture the INFO1 registers of interest here
+    // To optimizize power, we'll capture the INFO1 registers of interest here
     //  and power down OTP. The registers will then always be available.
     //
 
@@ -2077,9 +2549,6 @@ pwrctrl_INFO1_populate(void)
     g_sINFO1regs.ui32AUDADC_B1_HG_SLOPE     = info1buf[10];
     g_sINFO1regs.ui32AUDADC_B1_HG_INTERCEPT = info1buf[11];
 
-    RD_INFO1(AM_HAL_INFO_INFOSPACE_CURRENT_INFO1, (AM_REG_OTP_INFO1_FT1_GDR1_O / 4), 1, &info1buf[0]);
-    g_sINFO1regs.ui32FT1_GDR1               = info1buf[0];
-
     //
     // All done, mark the data as valid
     //
@@ -2099,7 +2568,6 @@ pwrctrl_INFO1_populate(void)
 uint32_t
 am_hal_pwrctrl_low_power_init(void)
 {
-    uint32_t ui32Ret;
     uint32_t ui32TrimVer = 0;
     uint32_t ui32RegVal = 0;
     bool bEnabled = false;
@@ -2169,35 +2637,24 @@ am_hal_pwrctrl_low_power_init(void)
     // will simply be read directly via am_hal_info1_read().
     //
     pwrctrl_INFO1_populate();
-
     //
     // Read PATCH_TRACKER0 from MRAM if INFO1 does not locate in OTP.
     //
     if ( g_sINFO1regs.ui32INFO1GlobalValid != INFO1GLOBALVALID )
     {
-        ui32Ret = am_hal_info1_read(AM_HAL_INFO_INFOSPACE_CURRENT_INFO1,
-                                    AM_REG_OTP_INFO1_PATCH_TRACKER0_O / 4,
-                                    1,
-                                    &g_sINFO1regs.ui32PATCH_TRACKER0);
-        if ( ui32Ret != AM_HAL_STATUS_SUCCESS )
-        {
-            return ui32Ret;
-        }
-
-        ui32Ret = am_hal_info1_read(AM_HAL_INFO_INFOSPACE_CURRENT_INFO1,
-                                    AM_REG_OTP_INFO1_FT1_GDR1_O / 4,
-                                    1,
-                                    &g_sINFO1regs.ui32FT1_GDR1);
-        if ( ui32Ret != AM_HAL_STATUS_SUCCESS )
-        {
-            return ui32Ret;
-        }
+        am_hal_info1_read(AM_HAL_INFO_INFOSPACE_CURRENT_INFO1,
+                          AM_REG_OTP_INFO1_PATCH_TRACKER0_O / 4,
+                          1,
+                          &g_sINFO1regs.ui32PATCH_TRACKER0);
     }
 
     //
     // Initialise SPOT manager
     //
-    am_hal_spotmgr_init();
+    if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+    {
+        am_hal_spotmgr_init();
+    }
 
     //
     // Power down Crypto.
@@ -2283,7 +2740,7 @@ am_hal_pwrctrl_low_power_init(void)
                 g_orig_CORELDOACTIVETRIM += CORELDOACTIVETRIM_REDUCE_IN_SIMOBUCK_INIT;
             }
         }
-        g_orig_D2ASPARE             = MCUCTRL->D2ASPARE;
+        g_orig_D2ASPARE             = MCUCTRL->D2ASPARE_b.D2ASPARE;
         g_orig_VDDCACTLOWTONTRIM    = MCUCTRL->SIMOBUCK2_b.VDDCACTLOWTONTRIM;
         g_orig_VDDCACTHIGHTONTRIM   = MCUCTRL->SIMOBUCK2_b.VDDCACTHIGHTONTRIM;
         g_orig_VDDCLVACTLOWTONTRIM  = MCUCTRL->SIMOBUCK4_b.VDDCLVACTLOWTONTRIM;
@@ -2302,15 +2759,33 @@ am_hal_pwrctrl_low_power_init(void)
 
 
     AM_CRITICAL_BEGIN
-    //
-    //  Initialize SIMOBUCK TON
-    //
-    am_hal_spotmgr_ton_config_init();
-    am_hal_spotmgr_ton_config_update(false, g_eCurGpuPwrMode);
+    if (APOLLO5_B0_LE_PCM0P7)
+    {
+        //
+        //  Initialize SIMOBUCK TON
+        //
+        am_hal_sysctrl_ton_config_init();
+        am_hal_sysctrl_ton_config_update(false, g_eCurGpuPwrMode);
+    }
+
     AM_CRITICAL_END
 
 #if AM_HAL_PWRCTRL_SIMOLP_AUTOSWITCH
-    am_hal_spotmgr_simobuck_lp_autosw_init();
+    if (APOLLO5_B0_GE_PCM1P0 || APOLLO5_B1_LE_PCM2P0 || APOLLO5_B2_PCM2P0)
+    {
+        // These settings decide at what loadcurrent Buck transitions from LP to active automatically.
+        PWRCTRL->TONCNTRCTRL_b.CLKDIV = 0;
+        PWRCTRL->TONCNTRCTRL_b.FCNT = 1000;
+        PWRCTRL->LPOVRHYSTCNT_b.LPOVRHYSTCNT = 0;
+        PWRCTRL->LPOVRTHRESHVDDS_b.LPOVRTHRESHVDDS = 800;
+        PWRCTRL->LPOVRTHRESHVDDF_b.LPOVRTHRESHVDDF = 450;
+        PWRCTRL->LPOVRTHRESHVDDC_b.LPOVRTHRESHVDDC = 600;
+        PWRCTRL->LPOVRTHRESHVDDCLV_b.LPOVRTHRESHVDDCLV = 250;
+        // This setting ensures that if buck is in LP mode upon entry to deepsleep, it will transition to active
+        // if the load increases slowly and stay in active for the rest of the time
+        PWRCTRL->TONCNTRCTRL_b.LPMODESWOVR = 0;
+        PWRCTRL->TONCNTRCTRL_b.ENABLELPOVR = 0;
+    }
 #endif
 
     // Execute clock mux reset
@@ -2398,7 +2873,10 @@ am_hal_pwrctrl_control(am_hal_pwrctrl_control_e eControl, void *pArgs)
                 {
                     return AM_HAL_STATUS_SUCCESS;
                 }
-                am_hal_spotmgr_simobuck_init_bfr_ovr();
+                if ( APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2 ) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+                {
+                    MCUCTRL->SIMOBUCK4_b.VDDCLVACTLOWTONTRIM = VDDCLVACTLOWTONTRIM_DEFAULT;
+                }
                 buck_ldo_override_init();
                 MCUCTRL->SIMOBUCK15_b.TRIMLATCHOVER = 1;
 
@@ -2411,12 +2889,72 @@ am_hal_pwrctrl_control(am_hal_pwrctrl_control_e eControl, void *pArgs)
                     MCUCTRL_SIMOBUCK0_VDDSRXCOMPEN_Msk |
                     MCUCTRL_SIMOBUCK0_VDDCLVRXCOMPEN_Msk;
 
-                //
-                // Enable the SIMOBUCK
-                //
-                am_hal_spotmgr_simobuck_init_bfr_enable();
-                PWRCTRL->VRCTRL_b.SIMOBUCKEN = 1;
-                am_hal_spotmgr_simobuck_init_aft_enable();
+                if ((APOLLO5_B0_GE_PCM0P7 || APOLLO5_GE_B1))
+                {
+                    //
+                    // Reduce coreldo output voltage
+                    //
+                    if ( APOLLO5_B0_GE_PCM1P1 || APOLLO5_B1_PCM2P0 || APOLLO5_B2_PCM2P0 )
+                    {
+                        if (g_bOrigTrimsStored)
+                        {
+                            FINAL_VAL_UDF_CAP_BASE(g_orig_CORELDOACTIVETRIM, CORELDOACTIVETRIM_REDUCE_IN_SIMOBUCK_INIT_B0TRIM3_B1TRIM1, MCUCTRL, LDOREG1, CORELDOACTIVETRIM);
+                        }
+                    }
+                    else if ( APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2 ) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+                    {
+                        if ( g_sSpotMgrINFO1regs.ui32SpotMgrINFO1GlobalValid == INFO1GLOBALVALID )
+                        {
+                            //
+                            // Reduce CORELDOACTIVETRIM
+                            //
+                            MCUCTRL->LDOREG1_b.CORELDOACTIVETRIM = g_sSpotMgrINFO1regs.sPowerStateArray[7].PWRSTATE_b.CORELDOACTTRIM;
+                        }
+                    }
+                    else
+                    {
+                        if (g_bOrigTrimsStored)
+                        {
+                            FINAL_VAL_UDF_CAP_BASE(g_orig_CORELDOACTIVETRIM, CORELDOACTIVETRIM_REDUCE_IN_SIMOBUCK_INIT, MCUCTRL, LDOREG1, CORELDOACTIVETRIM);
+                        }
+                    }
+                    //
+                    // Enable the SIMOBUCK
+                    //
+                    PWRCTRL->VRCTRL_b.SIMOBUCKEN = 1;
+                    //
+                    // Change memldo trim to support switching memldo reference to tvrgf
+                    // Switch memldo reference to tvrgf
+                    //
+                    if ( APOLLO5_B0_GE_PCM1P1 || APOLLO5_B1_PCM2P0 || APOLLO5_B2_PCM2P0)
+                    {
+                        MCUCTRL->LDOREG2_b.MEMLDOACTIVETRIM = 1;
+                        MCUCTRL->D2ASPARE = (MCUCTRL->D2ASPARE & ~(0x3UL << 15)) | (0x2UL << 15);
+                    }
+                    else if ( APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2 ) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+                    {
+                        if ( g_sSpotMgrINFO1regs.ui32SpotMgrINFO1GlobalValid == INFO1GLOBALVALID )
+                        {
+                            //
+                            // Change memldo trim to support switching memldo reference to tvrgf
+                            //
+                            MCUCTRL->LDOREG2_b.MEMLDOACTIVETRIM = g_sSpotMgrINFO1regs.sMemldoCfg.MEMLDOCONFIG_b.MEMLDOACTTRIM;
+                            MCUCTRL->D2ASPARE = (MCUCTRL->D2ASPARE & ~(0x3UL << 15)) | (g_sSpotMgrINFO1regs.sMemldoCfg.MEMLDOCONFIG_b.MEMLDOD2ASPARE << 15);
+                        }
+                    }
+                    else
+                    {
+                        MCUCTRL->LDOREG2_b.MEMLDOACTIVETRIM = 0;
+                        MCUCTRL->D2ASPARE = (MCUCTRL->D2ASPARE & ~(0x3UL << 15)) | (0x1UL << 15);
+                    }
+                }
+                else
+                {
+                    //
+                    // Enable the SIMOBUCK
+                    //
+                    PWRCTRL->VRCTRL_b.SIMOBUCKEN = 1;
+                }
             }
             break;
 
@@ -2498,8 +3036,10 @@ am_hal_pwrctrl_control(am_hal_pwrctrl_control_e eControl, void *pArgs)
             }
             else
             {
-                uint32_t ui32AllDisabledStatus = 0;
-                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_DEVPWR, false, &ui32AllDisabledStatus);
+                if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+                {
+                    am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_DEVPWR, false, NULL);
+                }
             }
             ui32Status = am_hal_delay_us_status_check(AM_HAL_PWRCTRL_MAX_WAIT_US,
                                                       (uint32_t) &(PWRCTRL->AUDSSPWREN),
@@ -2515,8 +3055,10 @@ am_hal_pwrctrl_control(am_hal_pwrctrl_control_e eControl, void *pArgs)
             }
             else
             {
-                uint32_t ui32AllDisabledStatus = 0;
-                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_AUDSSPWR, false, &ui32AllDisabledStatus);
+                if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+                {
+                    am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_AUDSSPWR, false, NULL);
+                }
             }
 
             break;
@@ -2575,6 +3117,7 @@ uint32_t
 am_hal_pwrctrl_settings_restore(void)
 {
     bool bEnabled = false;
+    am_hal_pwrctrl_temp_thresh_t dummy;
 
     //
     // Check CPU status, if it is HP, return failure.
@@ -2597,11 +3140,48 @@ am_hal_pwrctrl_settings_restore(void)
     {
         return AM_HAL_STATUS_FAIL;
     }
+    //
+    // For PCM2.1 and later versions, switches MCU to default power state 7.
+    //
+    if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+    {
+        //
+        // Turn on OTP if all peripherals are all off
+        //
+        if ((PWRCTRL->DEVPWRSTATUS == 0) &&
+            (PWRCTRL->AUDSSPWRSTATUS == 0 ))
+        {
+            if (am_hal_pwrctrl_periph_enable(AM_HAL_PWRCTRL_PERIPH_OTP) != AM_HAL_STATUS_SUCCESS)
+            {
+                return AM_HAL_STATUS_FAIL;
+            }
+        }
+        else
+        {
+            return AM_HAL_STATUS_FAIL;
+        }
+        //
+        // Report the lowest temperature to spotmgr
+        //
+        if (am_hal_pwrctrl_temp_update(-40.0f, &dummy) != AM_HAL_STATUS_SUCCESS)
+        {
+            return AM_HAL_STATUS_FAIL;
+        }
+        //
+        // Polling the timer AM_HAL_INTERNAL_TIMER_NUM_A status until it is disabled,
+        // to guarantee all power state updating operations are completed.
+        //
+        if (am_hal_delay_us_status_change(TIMER_A_DISABLE_WAIT_IN_US,
+                                          (uint32_t)&TIMERn(AM_HAL_INTERNAL_TIMER_NUM_A)->CTRL0,
+                                          TIMER_CTRL0_TMR0EN_Msk,
+                                          TIMER_CTRL0_TMR0EN_DIS)
+            != AM_HAL_STATUS_SUCCESS )
+        {
+            return AM_HAL_STATUS_TIMEOUT;
+        }
+    }
 
-    //
-    // Reset SPOT manager state to default state
-    //
-    return am_hal_spotmgr_default_reset();
+    return AM_HAL_STATUS_SUCCESS;
 }
 
 
@@ -2654,6 +3234,146 @@ am_hal_pwrctrl_pwrmodctl_cpdlp_get(am_hal_pwrctrl_pwrmodctl_cpdlp_t * psCpdlpCon
 
 // ****************************************************************************
 //
+//  vddc_vddf_tempco
+//
+// ****************************************************************************
+static inline void
+vddc_vddf_tempco(am_hal_pwrctrl_tempco_range_e eTempCoRange)
+{
+#if AM_HAL_ENABLE_TEMPCO_VDDC
+    int32_t i32TVRGCDiff = 0;
+    int32_t i32CORELDOReduce = 0;
+    int32_t i32TVRGCReduce = 0;
+#endif
+#if AM_HAL_ENABLE_TEMPCO_VDDF
+    int32_t i32TVRGFDiff = 0;
+    int32_t i32TVRGFReduce = 0;
+#endif
+    int32_t i32PosVal = 0;
+
+    if (g_bOrigTrimsStored && (PWRCTRL->VRSTATUS_b.SIMOBUCKST == PWRCTRL_VRSTATUS_SIMOBUCKST_ACT))
+    {
+        if (PWRCTRL->DEVPWREN_b.PWRENGFX)
+        {
+#if AM_HAL_ENABLE_TEMPCO_VDDC
+            i32TVRGCDiff = 9;
+#endif
+#if AM_HAL_ENABLE_TEMPCO_VDDF
+            i32TVRGFDiff = 15;
+#endif
+        }
+
+        switch (eTempCoRange)
+        {
+            case AM_HAL_PWRCTRL_TEMPCO_RANGE_LOW:
+#if AM_HAL_ENABLE_TEMPCO_VDDC
+                i32CORELDOReduce = 17;
+                i32TVRGCReduce = 35;
+#endif
+#if AM_HAL_ENABLE_TEMPCO_VDDF
+                i32TVRGFReduce = 10;
+#endif
+                break;
+
+            case AM_HAL_PWRCTRL_TEMPCO_RANGE_MID:
+#if AM_HAL_ENABLE_TEMPCO_VDDC
+                i32CORELDOReduce = 12;
+                i32TVRGCReduce = 20;
+#endif
+#if AM_HAL_ENABLE_TEMPCO_VDDF
+                i32TVRGFReduce = 10;
+#endif
+                break;
+
+            case AM_HAL_PWRCTRL_TEMPCO_RANGE_HIGH:
+#if AM_HAL_ENABLE_TEMPCO_VDDC
+                if ( APOLLO5_B0_GE_PCM1P1 || APOLLO5_B1_PCM2P0 || APOLLO5_B2_PCM2P0 )
+                {
+                    i32CORELDOReduce = CORELDOACTIVETRIM_REDUCE_IN_SIMOBUCK_INIT_B0TRIM3_B1TRIM1;
+                }
+                else
+                {
+                    i32CORELDOReduce = CORELDOACTIVETRIM_REDUCE_IN_SIMOBUCK_INIT;
+                }
+                i32TVRGCReduce = 0;
+#endif
+#if AM_HAL_ENABLE_TEMPCO_VDDF
+                i32TVRGFReduce = 0;
+#endif
+                break;
+
+            default:
+#if AM_HAL_ENABLE_TEMPCO_VDDC
+                i32CORELDOReduce = 0;
+                i32TVRGCReduce = 0;
+#endif
+#if AM_HAL_ENABLE_TEMPCO_VDDF
+                i32TVRGFReduce = 0;
+#endif
+                break;
+        }
+
+#if AM_HAL_ENABLE_TEMPCO_VDDC
+        if (i32CORELDOReduce > 0)
+        {
+            FINAL_VAL_UDF_CAP_BASE(g_orig_CORELDOACTIVETRIM, i32CORELDOReduce, MCUCTRL, LDOREG1, CORELDOACTIVETRIM);
+        }
+        else
+        {
+            i32PosVal = -i32CORELDOReduce;
+            FINAL_VAL_OVF_CAP_BASE(g_orig_CORELDOACTIVETRIM, i32PosVal, MCUCTRL, LDOREG1, CORELDOACTIVETRIM);
+        }
+        if (i32TVRGCReduce - i32TVRGCDiff > 0)
+        {
+            i32PosVal = i32TVRGCReduce - i32TVRGCDiff;
+            FINAL_VAL_UDF_CAP_BASE(g_orig_TVRGCVREFTRIM, i32PosVal, MCUCTRL, VREFGEN2, TVRGCVREFTRIM);
+        }
+        else
+        {
+            i32PosVal = -(i32TVRGCReduce - i32TVRGCDiff);
+            FINAL_VAL_OVF_CAP_BASE(g_orig_TVRGCVREFTRIM, i32PosVal, MCUCTRL, VREFGEN2, TVRGCVREFTRIM);
+        }
+#endif
+#if AM_HAL_ENABLE_TEMPCO_VDDF
+        if (i32TVRGFReduce - i32TVRGFDiff > 0)
+        {
+            i32PosVal = i32TVRGFReduce - i32TVRGFDiff;
+            FINAL_VAL_UDF_CAP_BASE(g_orig_TVRGFVREFTRIM, i32PosVal, MCUCTRL, VREFGEN4, TVRGFVREFTRIM);
+        }
+        else
+        {
+            i32PosVal = -(i32TVRGFReduce - i32TVRGFDiff);
+            FINAL_VAL_OVF_CAP_BASE(g_orig_TVRGFVREFTRIM, i32PosVal, MCUCTRL, VREFGEN4, TVRGFVREFTRIM);
+        }
+#endif
+    }
+}
+
+// ****************************************************************************
+//
+//  vddc_vddf_tempco_top
+//
+// ****************************************************************************
+static inline void
+vddc_vddf_tempco_top(am_hal_pwrctrl_tempco_range_e eTempCoRange)
+{
+    AM_CRITICAL_BEGIN
+
+    if (g_bPostponeTempco)
+    {
+        g_eTempCoRange = eTempCoRange;
+        g_bTempcoPending = true;
+    }
+    else
+    {
+        vddc_vddf_tempco(eTempCoRange);
+    }
+
+    AM_CRITICAL_END
+}
+
+// ****************************************************************************
+//
 //  am_hal_pwrctrl_temp_update()
 //  fCurTemp - Current temperature in Celsius.
 //  psTempThresh - This API returns this structure for notifying of thresholds
@@ -2667,28 +3387,175 @@ am_hal_pwrctrl_pwrmodctl_cpdlp_get(am_hal_pwrctrl_pwrmodctl_cpdlp_t * psCpdlpCon
 uint32_t
 am_hal_pwrctrl_temp_update(float fCurTemp, am_hal_pwrctrl_temp_thresh_t * psTempThresh)
 {
-    uint32_t ui32Status;
-    am_hal_spotmgr_tempco_param_t sTempCo;
-    sTempCo.fTemperature = fCurTemp;
+    am_hal_pwrctrl_tempco_range_e eTempRange;
+    am_hal_spotmgr_tempco_range_e eTempRange1;
 
-    //
-    // Update SPOTmanager on the temperature
-    //
-    ui32Status = am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_TEMP, false, (void *) &sTempCo);
-
-    if (ui32Status == AM_HAL_STATUS_SUCCESS)
+    if (APOLLO5_B0_LE_PCM0P7)
     {
-        psTempThresh->fLowThresh = sTempCo.fRangeLower;
-        psTempThresh->fHighThresh = sTempCo.fRangeHigher;
+        psTempThresh->fLowThresh = LOW_LIMIT;
+        psTempThresh->fHighThresh = HIGH_LIMIT;
         return AM_HAL_STATUS_SUCCESS;
+    }
+
+    if (APOLLO5_B1_GE_PCM2P1 || APOLLO5_B2_GE_PCM2P1 || APOLLO5_GT_B2) // B1 PCM2.1 and B1 later trim versions, B2 PCM2.1 and B2 later trim versions, and later silicon after B2.
+    {
+        if ((fCurTemp < VDDC_VDDF_TEMPCO_THRESHOLD_LOW) && (fCurTemp >= LOW_LIMIT))
+        {
+            eTempRange1 = AM_HAL_SPOTMGR_TEMPCO_RANGE_VERY_LOW;
+        }
+        else if ((fCurTemp >= VDDC_VDDF_TEMPCO_THRESHOLD_LOW) && (fCurTemp < VDDC_VDDF_TEMPCO_THRESHOLD_MID))
+        {
+            eTempRange1 = AM_HAL_SPOTMGR_TEMPCO_RANGE_LOW;
+        }
+        else if ((fCurTemp >= VDDC_VDDF_TEMPCO_THRESHOLD_MID) && (fCurTemp < VDDC_VDDF_TEMPCO_THRESHOLD_HIGH))
+        {
+            eTempRange1 = AM_HAL_SPOTMGR_TEMPCO_RANGE_MID;
+        }
+        else if ((fCurTemp >= VDDC_VDDF_TEMPCO_THRESHOLD_HIGH) && (fCurTemp < HIGH_LIMIT))
+        {
+            eTempRange1 = AM_HAL_SPOTMGR_TEMPCO_RANGE_HIGH;
+        }
+        else
+        {
+            eTempRange1 = AM_HAL_SPOTMGR_TEMPCO_OUT_OF_RANGE;
+        }
+        //
+        // Report temperature range change, set or clear g_bFrcBuckAct, assign the numbers to returned temperature threshold.
+        //
+        switch (eTempRange1)
+        {
+            case AM_HAL_SPOTMGR_TEMPCO_RANGE_VERY_LOW:
+                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_TEMP, false, (void *) &eTempRange1);
+                psTempThresh->fLowThresh = LOW_LIMIT;
+                psTempThresh->fHighThresh = VDDC_VDDF_TEMPCO_THRESHOLD_LOW;
+                break;
+            case AM_HAL_SPOTMGR_TEMPCO_RANGE_LOW:
+                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_TEMP, false, (void *) &eTempRange1);
+                psTempThresh->fLowThresh = VDDC_VDDF_TEMPCO_THRESHOLD_LOW - TEMP_HYSTERESIS;
+                psTempThresh->fHighThresh = VDDC_VDDF_TEMPCO_THRESHOLD_MID;
+                break;
+            case AM_HAL_SPOTMGR_TEMPCO_RANGE_MID:
+                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_TEMP, false, (void *) &eTempRange1);
+                psTempThresh->fLowThresh = VDDC_VDDF_TEMPCO_THRESHOLD_MID - TEMP_HYSTERESIS;
+                psTempThresh->fHighThresh = VDDC_VDDF_TEMPCO_THRESHOLD_HIGH;
+                break;
+            case AM_HAL_SPOTMGR_TEMPCO_RANGE_HIGH:
+                am_hal_spotmgr_power_state_update(AM_HAL_SPOTMGR_STIM_TEMP, false, (void *) &eTempRange1);
+                psTempThresh->fLowThresh = VDDC_VDDF_TEMPCO_THRESHOLD_HIGH - TEMP_HYSTERESIS;
+                psTempThresh->fHighThresh = HIGH_LIMIT;
+                break;
+            default:
+                psTempThresh->fLowThresh = 0.0f;
+                psTempThresh->fHighThresh = 0.0f;
+                return AM_HAL_STATUS_FAIL;
+        }
     }
     else
     {
-        psTempThresh->fLowThresh = 0.0f;
-        psTempThresh->fHighThresh = 0.0f;
-        return AM_HAL_STATUS_FAIL;
+        if ((fCurTemp < VDDC_VDDF_TEMPCO_THRESHOLD) && (fCurTemp >= LOW_LIMIT))
+        {
+            eTempRange = AM_HAL_PWRCTRL_TEMPCO_RANGE_LOW;
+        }
+        else if ((fCurTemp >= VDDC_VDDF_TEMPCO_THRESHOLD) && (fCurTemp < BUCK_LP_TEMP_THRESHOLD))
+        {
+            eTempRange = AM_HAL_PWRCTRL_TEMPCO_RANGE_MID;
+        }
+        else if ((fCurTemp >= BUCK_LP_TEMP_THRESHOLD) && (fCurTemp < HIGH_LIMIT))
+        {
+            eTempRange = AM_HAL_PWRCTRL_TEMPCO_RANGE_HIGH;
+        }
+        else
+        {
+            eTempRange = AM_HAL_PWRCTRL_TEMPCO_OUT_OF_RANGE;
+        }
+
+        switch (eTempRange)
+        {
+            case AM_HAL_PWRCTRL_TEMPCO_RANGE_LOW:
+                g_bFrcBuckAct = false;
+                vddc_vddf_tempco_top(AM_HAL_PWRCTRL_TEMPCO_RANGE_LOW);
+                psTempThresh->fLowThresh = LOW_LIMIT;
+                psTempThresh->fHighThresh = VDDC_VDDF_TEMPCO_THRESHOLD;
+                break;
+            case AM_HAL_PWRCTRL_TEMPCO_RANGE_MID:
+                g_bFrcBuckAct = false;
+                vddc_vddf_tempco_top(AM_HAL_PWRCTRL_TEMPCO_RANGE_MID);
+                psTempThresh->fLowThresh = VDDC_VDDF_TEMPCO_THRESHOLD - TEMP_HYSTERESIS;
+                psTempThresh->fHighThresh = BUCK_LP_TEMP_THRESHOLD;
+                break;
+            case AM_HAL_PWRCTRL_TEMPCO_RANGE_HIGH:
+                g_bFrcBuckAct = true;
+                vddc_vddf_tempco_top(AM_HAL_PWRCTRL_TEMPCO_RANGE_HIGH);
+                psTempThresh->fLowThresh = BUCK_LP_TEMP_THRESHOLD - TEMP_HYSTERESIS;
+                psTempThresh->fHighThresh = HIGH_LIMIT;
+                break;
+            default:
+                psTempThresh->fLowThresh = 0.0f;
+                psTempThresh->fHighThresh = 0.0f;
+                return AM_HAL_STATUS_FAIL;
+        }
+    }
+
+    return AM_HAL_STATUS_SUCCESS;
+}
+
+//*****************************************************************************
+//
+// Restore VDDC and VDDF settings before deepsleep to allow application to
+// suspend tempsensing during deeplseep.
+//
+//*****************************************************************************
+
+#if NO_TEMPSENSE_IN_DEEPSLEEP
+void
+vddc_vddf_setting_restore(void)
+{
+    if (g_bOrigTrimsStored && (PWRCTRL->VRSTATUS_b.SIMOBUCKST == PWRCTRL_VRSTATUS_SIMOBUCKST_ACT))
+    {
+        if (PWRCTRL->DEVPWREN_b.PWRENGFX)
+        {
+            //
+            // Restore VDDF, and boost 15 codes for GPU
+            //
+            FINAL_VAL_OVF_CAP_BASE(g_orig_TVRGFVREFTRIM, 15, MCUCTRL, VREFGEN4, TVRGFVREFTRIM);
+            //
+            // Restore VDDC, and boost 9 codes for GPU
+            //
+            FINAL_VAL_OVF_CAP_BASE(g_orig_TVRGCVREFTRIM, 9, MCUCTRL, VREFGEN2, TVRGCVREFTRIM);
+            //
+            // Delay 15 us
+            //
+            am_hal_delay_us(15);
+        }
+        else
+        {
+            //
+            // Restore VDDF
+            //
+            MCUCTRL->VREFGEN4_b.TVRGFVREFTRIM = g_orig_TVRGFVREFTRIM;
+            //
+            // Restore VDDC
+            //
+            MCUCTRL->VREFGEN2_b.TVRGCVREFTRIM = g_orig_TVRGCVREFTRIM;
+            //
+            // Set coreldo below simobuck VDDC
+            //
+            if ( APOLLO5_B0_GE_PCM1P1 || APOLLO5_B1_PCM2P0 || APOLLO5_B2_PCM2P0 )
+            {
+                FINAL_VAL_UDF_CAP_BASE(g_orig_CORELDOACTIVETRIM, CORELDOACTIVETRIM_REDUCE_IN_SIMOBUCK_INIT_B0TRIM3_B1TRIM1, MCUCTRL, LDOREG1, CORELDOACTIVETRIM);
+            }
+            else
+            {
+                FINAL_VAL_UDF_CAP_BASE(g_orig_CORELDOACTIVETRIM, CORELDOACTIVETRIM_REDUCE_IN_SIMOBUCK_INIT, MCUCTRL, LDOREG1, CORELDOACTIVETRIM);
+            }
+            //
+            // Delay 15 us
+            //
+            am_hal_delay_us(15);
+        }
     }
 }
+#endif
 
 //*****************************************************************************
 //
@@ -2701,7 +3568,7 @@ am_hal_pwrctrl_syspll_enable()
     AM_CRITICAL_BEGIN
     if (APOLLO5_GE_B1)
     {
-        MCUCTRL->D2ASPARE_b.PLLISOLATIONVDDHVDDF = 0;
+        MCUCTRL->D2ASPARE_b.D2ASPARE &= ~(0x1UL << 21);
         am_hal_delay_us(1);
     }
 
@@ -2732,7 +3599,7 @@ am_hal_pwrctrl_syspll_disable()
     if (APOLLO5_GE_B1)
     {
         am_hal_delay_us(1);
-        MCUCTRL->D2ASPARE_b.PLLISOLATIONVDDHVDDF = 1;
+        MCUCTRL->D2ASPARE_b.D2ASPARE |= (0x1UL << 21);
     }
     AM_CRITICAL_END
 
@@ -2751,6 +3618,8 @@ am_hal_pwrctrl_syspll_enabled(bool *bEnabled)
 
     return AM_HAL_STATUS_SUCCESS;
 }
+
+
 
 //*****************************************************************************
 //

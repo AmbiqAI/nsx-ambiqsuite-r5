@@ -4,6 +4,10 @@
 //!
 //! @brief Display related types declarations that are common across all of the
 //!        Ambiq Micro supported display devices.
+//!
+//! @addtogroup disp_type Display Devices Type Defines
+//! @ingroup devices
+//! @{
 //
 //*****************************************************************************
 
@@ -41,7 +45,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef AM_DEVICES_DISPLAY_TYPES_H
@@ -294,3 +298,9 @@ typedef struct
 #endif // NEMA_PLATFORM
 
 #endif // AM_DEVICES_DISPLAY_TYPES_H
+//*****************************************************************************
+//
+// End Doxygen group.
+//! @}
+//
+//*****************************************************************************

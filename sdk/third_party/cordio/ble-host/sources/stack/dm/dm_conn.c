@@ -1259,7 +1259,7 @@ void DmConnUpdate(dmConnId_t connId, hciConnSpec_t *pConnSpec)
     pMsg->hdr.event = (DmConnRole(connId) == DM_ROLE_MASTER) ?
                       DM_CONN_MSG_API_UPDATE_MASTER : DM_CONN_MSG_API_UPDATE_SLAVE;
     pMsg->hdr.param = connId;
-    memcpy((uint8_t *)&pMsg->connSpec, (uint8_t *)pConnSpec, sizeof(hciConnSpec_t));
+    memcpy(&pMsg->connSpec, pConnSpec, sizeof(hciConnSpec_t));
 
     WsfMsgSend(dmCb.handlerId, pMsg);
   }
@@ -1434,7 +1434,7 @@ void DmRemoteConnParamReqReply(dmConnId_t connId, hciConnSpec_t *pConnSpec)
   {
     pMsg->hdr.event = DM_CONN_MSG_API_REM_CONN_PARAM_REQ_REPLY;
     pMsg->hdr.param = connId;
-    memcpy((uint8_t *)&pMsg->connSpec, (uint8_t *)pConnSpec, sizeof(hciConnSpec_t));
+    memcpy(&pMsg->connSpec, pConnSpec, sizeof(hciConnSpec_t));
 
     WsfMsgSend(dmCb.handlerId, pMsg);
   }

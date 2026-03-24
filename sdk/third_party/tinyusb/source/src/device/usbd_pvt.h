@@ -78,7 +78,7 @@ bool usbd_edpt_open(uint8_t rhport, tusb_desc_endpoint_t const * desc_ep);
 void usbd_edpt_close(uint8_t rhport, uint8_t ep_addr);
 
 // Submit a usb transfer
-#if defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5B)
 bool usbd_edpt_xfer(uint8_t rhport, uint8_t ep_addr, uint8_t * buffer, uint32_t total_bytes);
 #else
 bool usbd_edpt_xfer(uint8_t rhport, uint8_t ep_addr, uint8_t * buffer, uint16_t total_bytes);

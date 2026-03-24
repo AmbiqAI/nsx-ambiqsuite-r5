@@ -269,7 +269,7 @@ static void fitDmCback(dmEvt_t *pDmEvt)
 
   if ((pMsg = WsfMsgAlloc(len)) != NULL)
   {
-    memcpy((uint8_t *)pMsg, (uint8_t *)pDmEvt, len);
+    memcpy(pMsg, pDmEvt, len);
     WsfMsgSend(fitHandlerId, pMsg);
   }
 }
@@ -321,7 +321,7 @@ static void fitCccCback(attsCccEvt_t *pEvt)
 
   if ((pMsg = WsfMsgAlloc(sizeof(attsCccEvt_t))) != NULL)
   {
-    memcpy((uint8_t *)pMsg, (uint8_t *)pEvt, sizeof(attsCccEvt_t));
+    memcpy(pMsg, pEvt, sizeof(attsCccEvt_t));
     WsfMsgSend(fitHandlerId, pMsg);
   }
 }

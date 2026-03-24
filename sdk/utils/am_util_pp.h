@@ -1,10 +1,12 @@
 //*****************************************************************************
 //
-//! @file am_util_pp.h
+//
+//! @file am_bsp_pp.h
 //!
 //! @brief Functions to aid power profiling and debugging
 //!
-//! @addtogroup ppf Power Profiling Functionality
+//! @addtogroup BSP Board Support Package (BSP), release date: TBD
+//! @addtogroup pp Power Profiling Functionality
 //! @ingroup utils
 //! @{
 //
@@ -44,7 +46,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -400,36 +402,18 @@ typedef struct
 }
 am_util_pp_b5_t;
 
-//*****************************************************************************
-//
-//! @brief Prints the filled up JSON to serial port.
-//!
-//! @param void
-//!
-//! This function will print filled JSON fields to serial port.
-//!
-//! @note - before use this function, make sure the UART or SWO is enabled
-//!
-//!
-//! @returns None
-//
-//*****************************************************************************
-extern void am_util_print_JSON(uint8_t uNumber);
+
+void am_util_print_JSON(uint8_t uNumber);
 
 //*****************************************************************************
 //
-//! @brief Iinvoke the snapshot
-//!
-//! @param bDebug - a flag to indicate it's a debug or not
-//! @param uNumber - snapshot number
-//! @param bUseMemory - whether or not to store the JSON to memory
-//!
-//! This is the customer facing API function calls to invoke the snapshot
-//!
-//! @returns None
-//
+// Main APIs
+// Parameters--
+// bDebug: a flag to indicate it's a debug or not
+// uNumber: snapshot number
+// bUseMemory: whether or not to store the JSON to memory
 //*****************************************************************************
-extern void am_util_pp_snapshot(bool bDebug, uint32_t uNumber, bool bStreamNow);
+void am_util_pp_snapshot(bool bDebug, uint32_t uNumber, bool bStreamNow);
 
 #ifdef __cplusplus
 }

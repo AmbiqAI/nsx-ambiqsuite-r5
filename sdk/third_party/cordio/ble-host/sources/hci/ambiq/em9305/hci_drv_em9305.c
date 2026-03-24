@@ -40,7 +40,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p2-040c7863bb of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -372,7 +372,7 @@ HciDrvRadioBoot(bool bColdBoot)
     uint32_t IntNum = GPIO_INT;
     am_hal_gpio_interrupt_register(GPIO_INT_CHANNEL, IntNum, (am_hal_gpio_handler_t)HciDrvIntService, NULL);
     am_devices_em9305_enable_interrupt();
-    #if defined(apollo510_eb_revb_em9305) || defined(APOLLO510_EVB)
+    #if defined(apollo5b_eb_revb_em9305) || defined(APOLLO510_EVB)
     am_util_stdio_printf("Configuring IRQ for discrete EM9305\r\n");
     #endif
 #ifdef AM_IRQ_PRIORITY_DEFAULT
@@ -1056,11 +1056,14 @@ void HciVscDisablePowerCtrl(void)
  */
 /*************************************************************************************************/
 bool_t
-HciVscSetRfPowerLevelEx(int8_t txPowerlevel)
+HciVscSetRfPowerLevelEx(txPowerLevel_t txPowerlevel)
 {
-    if((txPowerlevel > TX_POWER_LEVEL_MIN_DBM) && (txPowerlevel <= TX_POWER_LEVEL_MAXIMUM))
+    // make sure it's 8 bit
+    uint8_t tx_power_level = (uint8_t)txPowerlevel;
+
+    if(txPowerlevel < TX_POWER_LEVEL_INVALID)
     {
-        HciVendorSpecificCmd(HCI_VSC_SET_TX_POWER_LEVEL_CMD_OPCODE, HCI_VSC_SET_TX_POWER_LEVEL_CMD_LENGTH, (uint8_t *)&txPowerlevel);
+        HciVendorSpecificCmd(HCI_VSC_SET_TX_POWER_LEVEL_CMD_OPCODE, sizeof(tx_power_level), &tx_power_level);
         return true;
     }
     else
@@ -1177,6 +1180,7 @@ HciVscTransmitTestEnd(void)
     HciVendorSpecificCmd(HCI_VSC_END_TRANSMIT_TEST_CMD_OPCODE, HCI_VSC_END_TRANSMIT_TEST_CMD_LENGTH, NULL);
 }
 
+
 /*************************************************************************************************/
 /*!
  *  \fn     HciDrvBleSleepSet
@@ -1191,7 +1195,7 @@ HciVscTransmitTestEnd(void)
 void
 HciDrvBleSleepSet(bool enable)
 {
-    HciVendorSpecificCmd(HCI_VSC_SET_SLEEP_OPTION_CMD_OPCODE, HCI_VSC_SET_SLEEP_OPTION_CMD_LENGTH, (uint8_t *)&enable);
+    //TODO add vender cmd
 }
 
 //*****************************************************************************

@@ -103,17 +103,16 @@ static appDbRec_t *pAppDbNewRec = appDb.rec;
 //
 //
 #ifdef AM_VOS_SDK
-#if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4P)  || defined(AM_PART_APOLLO4L) ||    \
-    defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5A) || (AM_PART_APOLLO5B)||(AM_PART_APOLLO4B) || defined(AM_PART_APOLLO4P) || defined(AM_PART_APOLLO4L)
 appDbRec_t * pRecListNvmPointer = (appDbRec_t *)0x000FE000;
 #endif
 #else
 
-#if defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5A) || (AM_PART_APOLLO5B)
 appDbRec_t * pRecListNvmPointer = (appDbRec_t *)0x00600000; //temporarily put the data here
 #else
 appDbRec_t * pRecListNvmPointer = (appDbRec_t *)0x00070000; //temporarily put the data here
-#endif // #if defined(AM_PART_APOLLO510)
+#endif // #if defined(AM_PART_APOLLO5A) || (AM_PART_APOLLO5B)
 
 #endif // AM_VOS_SDK
 
@@ -137,8 +136,7 @@ void AppLoadResList(void)
 }
 void AppCopyRecListInNvm(appDbRec_t *pRecord)
 {
-#if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5A) || (AM_PART_APOLLO5B)||(AM_PART_APOLLO4) || defined(AM_PART_APOLLO4B) || defined(AM_PART_APOLLO4L) || defined(AM_PART_APOLLO4P)
     uint32_t* uint32RecListPointer =  (uint32_t *)pRecListNvmPointer;
 #else
     appDbRec_t* pNvmRec =  pRecListNvmPointer;
@@ -146,8 +144,7 @@ void AppCopyRecListInNvm(appDbRec_t *pRecord)
     uint8_t i;
     for(i=0;i<APP_DB_NUM_RECS;i++)
     {
-    #if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-        defined(AM_PART_APOLLO510)
+    #if defined(AM_PART_APOLLO5A) || (AM_PART_APOLLO5B)||(AM_PART_APOLLO4) || defined(AM_PART_APOLLO4B) || defined(AM_PART_APOLLO4L) || defined(AM_PART_APOLLO4P)
         appDbRec_t* pNvmRec = (appDbRec_t*)uint32RecListPointer;
     #endif
 
@@ -156,12 +153,11 @@ void AppCopyRecListInNvm(appDbRec_t *pRecord)
              (*(uint32_t*)pPeerAddr != 0x00000000) )
         {
             //valid record in NVM
-            memcpy((uint8_t *)pRecord, (uint8_t *)pNvmRec, sizeof(appDbRec_t));
+            memcpy(pRecord, pNvmRec, sizeof(appDbRec_t));
 
             //pRecord->inUse = FALSE;
             //pRecord->valid = TRUE;
-#if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5A) || (AM_PART_APOLLO5B)||(AM_PART_APOLLO4) || defined(AM_PART_APOLLO4B) || defined(AM_PART_APOLLO4L) || defined(AM_PART_APOLLO4P)
             uint32RecListPointer += NVM_REC_WORD_LEN;
 #else
             pNvmRec++;
@@ -174,8 +170,8 @@ void AppCopyRecListInNvm(appDbRec_t *pRecord)
         }
     }
 }
-#if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5A) || (AM_PART_APOLLO5B)||(AM_PART_APOLLO4) || defined(AM_PART_APOLLO4B) || defined(AM_PART_APOLLO4L) || defined(AM_PART_APOLLO4P)
+
 // sizeof(appDbRec_t) = 176 bytes of buffer
 uint8_t ui8DbRamBuffer[APP_DB_NUM_RECS * NVM_REC_BYTE_LEN];
 uint16_t ui16DbRamBufferSize = APP_DB_NUM_RECS * NVM_REC_BYTE_LEN;
@@ -193,8 +189,7 @@ static void updateRecordInNVM(uint32_t* pDest, uint32_t* pSrc, uint32_t* pFlashA
     memcpy((uint8_t *)pDest, (uint8_t *)pSrc, ui16Size);
 
     uint32_t ui32Critical = am_hal_interrupt_master_disable();
-#if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||   \
-    defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5A) || (AM_PART_APOLLO5B)||(AM_PART_APOLLO4) || defined(AM_PART_APOLLO4B) || defined(AM_PART_APOLLO4L) || defined(AM_PART_APOLLO4P)
     am_hal_mram_main_program(AM_HAL_MRAM_PROGRAM_KEY,
                               (uint32_t *)ui8DbRamBuffer,
                               (uint32_t *)pFlashAddr,
@@ -217,8 +212,7 @@ static void updateRecordInNVM(uint32_t* pDest, uint32_t* pSrc, uint32_t* pFlashA
 
 int32_t AppDbUpdateNVM(appDbHdl_t hdl)
 {
-#if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+#if defined (AM_PART_APOLLO5A) || (AM_PART_APOLLO5B)||(AM_PART_APOLLO4) || defined(AM_PART_APOLLO4B) || defined(AM_PART_APOLLO4L) || defined(AM_PART_APOLLO4P)
     uint32_t* pNvmRec =  (uint32_t *)pRecListNvmPointer;
     uint8_t * pRamBufRec = ui8DbRamBuffer;
 #else
@@ -237,8 +231,7 @@ int32_t AppDbUpdateNVM(appDbHdl_t hdl)
         {
             if(BdaCmp(((appDbRec_t*)hdl)->peerAddr, ((appDbRec_t* )pNvmRec)->peerAddr))
             {
-#if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+#if defined (AM_PART_APOLLO5A) || (AM_PART_APOLLO5B)||(AM_PART_APOLLO4) || defined(AM_PART_APOLLO4B) || defined(AM_PART_APOLLO4L) || defined(AM_PART_APOLLO4P)
                 updateRecordInNVM((uint32_t*)&pRamBufRec[i*NVM_REC_BYTE_LEN], (uint32_t*)((appDbRec_t*)hdl)->peerAddr, (uint32_t*)pRecListNvmPointer);
 #else
                 updateRecordInNVM((uint32_t*)&pRamBufRec[i], (uint32_t*)((appDbRec_t*)hdl)->peerAddr, (uint32_t*)pRecListNvmPointer);
@@ -247,8 +240,7 @@ int32_t AppDbUpdateNVM(appDbHdl_t hdl)
             }
 
             //skip
-#if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5A) || (AM_PART_APOLLO5B)||(AM_PART_APOLLO4) || defined(AM_PART_APOLLO4B) || defined(AM_PART_APOLLO4L) || defined(AM_PART_APOLLO4P)
             pNvmRec += NVM_REC_WORD_LEN;
 #else
             pNvmRec++;
@@ -257,8 +249,7 @@ int32_t AppDbUpdateNVM(appDbHdl_t hdl)
         else
         {
             uint32_t ui32Critical = am_hal_interrupt_master_disable();
-#if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5A) || (AM_PART_APOLLO5B)||(AM_PART_APOLLO4) || defined(AM_PART_APOLLO4B) || defined(AM_PART_APOLLO4L) || defined(AM_PART_APOLLO4P)
             am_hal_mram_main_program(AM_HAL_MRAM_PROGRAM_KEY,
                                       (uint32_t *)((appDbRec_t*)hdl)->peerAddr,
                                       (uint32_t *)pNvmRec,
@@ -279,8 +270,7 @@ int32_t AppDbUpdateNVM(appDbHdl_t hdl)
     // function spec: erase all the record and record the current one
     // erase the page
     uint32_t ui32Critical = am_hal_interrupt_master_disable();
-#if defined(AM_PART_APOLLO4B)  || defined(AM_PART_APOLLO4L)  || defined(AM_PART_APOLLO4P) ||    \
-    defined(AM_PART_APOLLO510)
+#if defined(AM_PART_APOLLO5A) || (AM_PART_APOLLO5B)||(AM_PART_APOLLO4) || defined(AM_PART_APOLLO4B) || defined(AM_PART_APOLLO4L) || defined(AM_PART_APOLLO4P)
     am_hal_mram_main_program(AM_HAL_MRAM_PROGRAM_KEY,
                               (uint32_t *)((appDbRec_t*)hdl)->peerAddr,
                               (uint32_t *)pRecListNvmPointer,
