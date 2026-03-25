@@ -11,3 +11,7 @@ Branch model:
 - `r5.2`: Apollo5B-era lineage
 - `r5.2-alpha`: Apollo330-era lineage
 - `r5.3`: Apollo510 default lineage
+
+Licensing for the imported SDK content follows the upstream AmbiqSuite terms.
+See [`UPSTREAM-LICENSE-NOTICE.md`](UPSTREAM-LICENSE-NOTICE.md) for the
+provenance note for this repo.
