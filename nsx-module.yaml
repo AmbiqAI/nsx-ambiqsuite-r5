@@ -11,6 +11,24 @@ support:
   ambiqsuite: true
   zephyr: false
 
+summary: AmbiqSuite r5 SDK provider selection for Apollo5, Apollo510, and Apollo330P based NSX targets.
+
+capabilities:
+  - sdk_provider
+  - ambiqsuite
+  - apollo5_family
+
+use_cases:
+  - choose the SDK baseline for Apollo5-generation apps
+  - provide upstream SDK content for r5-based platform stacks
+  - foundation for r5 HAL and BSP layers
+
+agent_keywords:
+  - ambiqsuite
+  - r5
+  - sdk
+  - provider
+
 build:
   cmake:
     package: nsx_soc_apollo510
