@@ -2,11 +2,48 @@
 //
 //! @file am_devices_mspi_is25wx064.c
 //!
-//! @brief General Multibit SPI Flash driver.
+//! @brief Multi-bit SPI Flash driver for the IS25WX064 device.
 //!
-//! @addtogroup mspi_serial_flash IS25WX064 MSPI FLASH Driver
+//! @addtogroup devices_mspi_is25wx064 IS25WX064 MSPI Flash Driver
 //! @ingroup devices
 //! @{
+//!
+//! Purpose: This module provides a hardware abstraction layer
+//!          for the IS25WX064 Multi-bit SPI Flash memory device. It supports
+//!          high-speed read/write operations, sector/block erase, and XIP
+//!          functionality for embedded applications requiring external non-volatile
+//!          memory. The driver enables efficient data storage, firmware updates,
+//!          and code execution directly from flash memory.
+//!
+//! @section devices_mspi_is25wx064_features Key Features
+//!
+//! 1. @b High-speed @b Access: Multi-bit SPI for fast read/write operations.
+//! 2. @b XIP @b Support: Execute code directly from flash memory.
+//! 3. @b Sector/Block @b Erase: Flexible memory management options.
+//! 4. @b Security @b Features: Write protection and security registers.
+//! 5. @b Power @b Management: Low-power modes and fast wake-up.
+//!
+//! @section devices_mspi_is25wx064_functionality Functionality
+//!
+//! - Initialize and configure IS25WX064 device
+//! - Perform read/write operations with DMA support
+//! - Handle sector and block erase operations
+//! - Manage XIP mode configuration
+//! - Control security features
+//!
+//! @section devices_mspi_is25wx064_usage Usage
+//!
+//! 1. Initialize device with am_devices_mspi_is25wx064_init()
+//! 2. Read/write data using blocking or non-blocking APIs
+//! 3. Enable XIP mode for code execution from flash
+//! 4. Configure security features as needed
+//!
+//! @section devices_mspi_is25wx064_configuration Configuration
+//!
+//! - Set up MSPI interface and timing parameters
+//! - Configure DMA for data transfers
+//! - Enable security features
+//! - Optimize power management settings
 //
 //*****************************************************************************
 
@@ -44,7 +81,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -168,7 +205,6 @@ MSPI_IS25WX064_Serial_CE0_MSPIConfig =
     .bEnWriteLatency      = false,
     .bEmulateDDR          = false,
 #if defined(AM_PART_APOLLO5_API)
-    .bNewDDR              = false,
     .eCeLatency           = AM_HAL_MSPI_CE_LATENCY_NORMAL,
 #endif
     .ui16DMATimeLimit     = 0,
@@ -196,7 +232,6 @@ MSPI_IS25WX064_Serial_CE1_MSPIConfig =
     .bEnWriteLatency      = false,
     .bEmulateDDR          = false,
 #if defined(AM_PART_APOLLO5_API)
-    .bNewDDR              = false,
     .eCeLatency           = AM_HAL_MSPI_CE_LATENCY_NORMAL,
 #endif
     .ui16DMATimeLimit     = 0,
@@ -224,7 +259,6 @@ DDROctalCE0MSPIConfig =
     .bEnWriteLatency      = true,
     .bEmulateDDR          = true,
 #if defined(AM_PART_APOLLO5_API)
-    .bNewDDR              = false,
     .eCeLatency           = AM_HAL_MSPI_CE_LATENCY_NORMAL,
 #endif
     .ui16DMATimeLimit     = 0,
@@ -252,7 +286,6 @@ DDROctalCE1MSPIConfig =
     .bEnWriteLatency      = true,
     .bEmulateDDR          = true,
 #if defined(AM_PART_APOLLO5_API)
-    .bNewDDR              = false,
     .eCeLatency           = AM_HAL_MSPI_CE_LATENCY_NORMAL,
 #endif
     .ui16DMATimeLimit     = 0,
@@ -280,7 +313,6 @@ OctalCE0_1_8_8_MSPIConfig =
     .bEnWriteLatency      = false,
     .bEmulateDDR          = false,
 #if defined(AM_PART_APOLLO5_API)
-    .bNewDDR              = false,
     .eCeLatency           = AM_HAL_MSPI_CE_LATENCY_NORMAL,
 #endif
     .ui16DMATimeLimit     = 0,
@@ -308,7 +340,6 @@ OctalCE1_1_8_8_MSPIConfig =
     .bEnWriteLatency      = false,
     .bEmulateDDR          = false,
 #if defined(AM_PART_APOLLO5_API)
-    .bNewDDR              = false,
     .eCeLatency           = AM_HAL_MSPI_CE_LATENCY_NORMAL,
 #endif
     .ui16DMATimeLimit     = 0,
@@ -707,7 +738,7 @@ is25wx064_flag_status_register_read_until(void *pHandle, uint32_t timeout_ms)
     while ( ms < timeout_ms )
     {
         command_read_serial(pHandle, AM_DEVICES_MSPI_IS25WX064_READ_FLAG_STATUS_REGISTER, false, 0, pui8Response, 1);
-        // am_util_stdio_printf("Flag status register = 0x%02x\n", *pui8Response);
+        am_util_stdio_printf("Flag status register = 0x%02x\n", *pui8Response);
         if ((*pui8Response & 0x80) == 0)
         {
             am_util_delay_ms(1);
@@ -3806,7 +3837,16 @@ am_devices_mspi_is25wx064_init_timing_check(uint32_t module,
     am_hal_mspi_timing_scan_t timingCfg;
     if (bConfigSaved)
     {
-        timingCfg.bTxNeg            = sTimingConfigStored.bTxNeg;
+
+        ui32Status = am_hal_mspi_control(pHandle, AM_HAL_MSPI_REQ_TIMING_SCAN_GET, &timingCfg);
+        if (AM_HAL_STATUS_SUCCESS != ui32Status)
+        {
+            return AM_DEVICES_MSPI_IS25WX064_STATUS_ERROR;
+        }
+
+        //
+        // Do not override bTxNeg
+        //
         timingCfg.bRxNeg            = sTimingConfigStored.bRxNeg;
         timingCfg.bRxCap            = sTimingConfigStored.bRxCap;
         timingCfg.ui8TxDQSDelay     = sTimingConfigStored.ui8TxDQSDelay;

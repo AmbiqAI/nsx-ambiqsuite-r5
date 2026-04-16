@@ -24,6 +24,7 @@
 #ifndef HCI_API_H
 #define HCI_API_H
 
+#include "cfg_stack.h"
 #include "wsf_types.h"
 #include "hci_defs.h"
 #include "wsf_os.h"
@@ -46,93 +47,106 @@ extern "C" {
  * Proprietary HCI event codes for handling HCI events in callbacks.
  */
 /**@{*/
-#define HCI_RESET_SEQ_CMPL_CBACK_EVT                     0   /*!< \brief Reset sequence complete */
-#define HCI_LE_CONN_CMPL_CBACK_EVT                       1   /*!< \brief LE connection complete */
-#define HCI_LE_ENHANCED_CONN_CMPL_CBACK_EVT              2   /*!< \brief LE enhanced connection complete */
-#define HCI_DISCONNECT_CMPL_CBACK_EVT                    3   /*!< \brief Disconnect complete */
-#define HCI_LE_CONN_UPDATE_CMPL_CBACK_EVT                4   /*!< \brief LE connection update complete */
-#define HCI_LE_CREATE_CONN_CANCEL_CMD_CMPL_CBACK_EVT     5   /*!< \brief LE create connection cancel command complete */
-#define HCI_LE_ADV_REPORT_CBACK_EVT                      6   /*!< \brief LE advertising report */
-#define HCI_READ_RSSI_CMD_CMPL_CBACK_EVT                 7   /*!< \brief Read RSSI command complete */
-#define HCI_LE_READ_CHAN_MAP_CMD_CMPL_CBACK_EVT          8   /*!< \brief LE Read channel map command complete */
-#define HCI_READ_TX_PWR_LVL_CMD_CMPL_CBACK_EVT           9   /*!< \brief Read transmit power level command complete */
-#define HCI_READ_REMOTE_VER_INFO_CMPL_CBACK_EVT          10  /*!< \brief Read remote version information complete */
-#define HCI_LE_READ_REMOTE_FEAT_CMPL_CBACK_EVT           11  /*!< \brief LE read remote features complete */
-#define HCI_LE_LTK_REQ_REPL_CMD_CMPL_CBACK_EVT           12  /*!< \brief LE LTK request reply command complete */
-#define HCI_LE_LTK_REQ_NEG_REPL_CMD_CMPL_CBACK_EVT       13  /*!< \brief LE LTK request negative reply command complete */
-#define HCI_ENC_KEY_REFRESH_CMPL_CBACK_EVT               14  /*!< \brief Encryption key refresh complete */
-#define HCI_ENC_CHANGE_CBACK_EVT                         15  /*!< \brief Encryption change */
-#define HCI_LE_LTK_REQ_CBACK_EVT                         16  /*!< \brief LE LTK request */
-#define HCI_VENDOR_SPEC_CMD_STATUS_CBACK_EVT             17  /*!< \brief Vendor specific command status */
-#define HCI_VENDOR_SPEC_CMD_CMPL_CBACK_EVT               18  /*!< \brief Vendor specific command complete */
-#define HCI_VENDOR_SPEC_CBACK_EVT                        19  /*!< \brief Vendor specific */
-#define HCI_HW_ERROR_CBACK_EVT                           20  /*!< \brief Hardware error */
-#define HCI_LE_ADD_DEV_TO_RES_LIST_CMD_CMPL_CBACK_EVT    21  /*!< \brief LE add device to resolving list command complete */
-#define HCI_LE_REM_DEV_FROM_RES_LIST_CMD_CMPL_CBACK_EVT  22  /*!< \brief LE remove device from resolving command complete */
-#define HCI_LE_CLEAR_RES_LIST_CMD_CMPL_CBACK_EVT         23  /*!< \brief LE clear resolving list command complete */
-#define HCI_LE_READ_PEER_RES_ADDR_CMD_CMPL_CBACK_EVT     24  /*!< \brief LE read peer resolving address command complete */
-#define HCI_LE_READ_LOCAL_RES_ADDR_CMD_CMPL_CBACK_EVT    25  /*!< \brief LE read local resolving address command complete */
-#define HCI_LE_SET_ADDR_RES_ENABLE_CMD_CMPL_CBACK_EVT    26  /*!< \brief LE set address resolving enable command complete */
-#define HCI_LE_ENCRYPT_CMD_CMPL_CBACK_EVT                27  /*!< \brief LE encrypt command complete */
-#define HCI_LE_RAND_CMD_CMPL_CBACK_EVT                   28  /*!< \brief LE rand command complete */
-#define HCI_LE_REM_CONN_PARAM_REP_CMD_CMPL_CBACK_EVT     29  /*!< \brief LE remote connection parameter request reply complete */
-#define HCI_LE_REM_CONN_PARAM_NEG_REP_CMD_CMPL_CBACK_EVT 30  /*!< \brief LE remote connection parameter request negative reply complete */
-#define HCI_LE_READ_DEF_DATA_LEN_CMD_CMPL_CBACK_EVT      31  /*!< \brief LE read suggested default data length command complete */
-#define HCI_LE_WRITE_DEF_DATA_LEN_CMD_CMPL_CBACK_EVT     32  /*!< \brief LE write suggested default data length command complete */
-#define HCI_LE_SET_DATA_LEN_CMD_CMPL_CBACK_EVT           33  /*!< \brief LE set data length command complete */
-#define HCI_LE_READ_MAX_DATA_LEN_CMD_CMPL_CBACK_EVT      34  /*!< \brief LE read maximum data length command complete */
-#define HCI_LE_REM_CONN_PARAM_REQ_CBACK_EVT              35  /*!< \brief LE remote connection parameter request */
-#define HCI_LE_DATA_LEN_CHANGE_CBACK_EVT                 36  /*!< \brief LE data length change */
-#define HCI_LE_READ_LOCAL_P256_PUB_KEY_CMPL_CBACK_EVT    37  /*!< \brief LE read local P-256 public key */
-#define HCI_LE_GENERATE_DHKEY_CMPL_CBACK_EVT             38  /*!< \brief LE generate DHKey complete */
-#define HCI_WRITE_AUTH_PAYLOAD_TO_CMD_CMPL_CBACK_EVT     39  /*!< \brief Write authenticated payload timeout command complete */
-#define HCI_AUTH_PAYLOAD_TO_EXPIRED_CBACK_EVT            40  /*!< \brief Authenticated payload timeout expired event */
-#define HCI_LE_READ_PHY_CMD_CMPL_CBACK_EVT               41  /*!< \brief LE read phy command complete */
-#define HCI_LE_SET_DEF_PHY_CMD_CMPL_CBACK_EVT            42  /*!< \brief LE set default phy command complete */
-#define HCI_LE_PHY_UPDATE_CMPL_CBACK_EVT                 43  /*!< \brief LE phy update complete */
-#define HCI_LE_EXT_ADV_REPORT_CBACK_EVT                  44  /*!< \brief LE extended advertising report */
-#define HCI_LE_SCAN_TIMEOUT_CBACK_EVT                    45  /*!< \brief LE scan timeout event */
-#define HCI_LE_ADV_SET_TERM_CBACK_EVT                    46  /*!< \brief LE advertising set terminated event */
-#define HCI_LE_SCAN_REQ_RCVD_CBACK_EVT                   47  /*!< \brief LE scan request received event */
-#define HCI_LE_PER_ADV_SYNC_EST_CBACK_EVT                48  /*!< \brief LE periodic advertising sync established event */
-#define HCI_LE_PER_ADV_REPORT_CBACK_EVT                  49  /*!< \brief LE periodic advertising report event */
-#define HCI_LE_PER_ADV_SYNC_LOST_CBACK_EVT               50  /*!< \brief LE periodic advertising synch lost event */
-#define HCI_LE_CH_SEL_ALGO_CBACK_EVT                     51  /*!< \brief LE channel selection algorithm event */
-#define HCI_LE_SCAN_ENABLE_CMD_CMPL_CBACK_EVT            52  /*!< \brief LE scan enable command complete  */
-#define HCI_LE_ADV_ENABLE_CMD_CMPL_CBACK_EVT             53  /*!< \brief LE advertise enable command complete  */
-#define HCI_LE_EXT_SCAN_ENABLE_CMD_CMPL_CBACK_EVT        54  /*!< \brief LE extended scan enable command complete  */
-#define HCI_LE_EXT_ADV_ENABLE_CMD_CMPL_CBACK_EVT         55  /*!< \brief LE extended advertise enable command complete  */
-#define HCI_LE_PER_ADV_ENABLE_CMD_CMPL_CBACK_EVT         56  /*!< \brief LE periodic advertise enable command complete  */
-#define HCI_LE_SET_RAND_ADDR_CMD_CMPL_CBACK_EVT          57  /*!< \brief LE set random address command complete  */
-#define HCI_LE_PER_SYNC_TRSF_RCVD_CBACK_EVT              58  /*!< \brief LE periodic advertising sync transfer received event */
-#define HCI_LE_PER_ADV_SYNC_TRSF_CMD_CMPL_CBACK_EVT      59  /*!< \brief LE periodic advertising sync transfer command complete  */
-#define HCI_LE_PER_ADV_SET_INFO_TRSF_CMD_CMPL_CBACK_EVT  60  /*!< \brief LE set periodic advertising set info transfer command complete  */
-#define HCI_LE_CONN_IQ_REPORT_CBACK_EVT                  61  /*!< \brief LE connection IQ report event */
-#define HCI_LE_CTE_REQ_FAILED_CBACK_EVT                  62  /*!< \brief LE CTE request failed event */
-#define HCI_LE_SET_CONN_CTE_RX_PARAMS_CMD_CMPL_CBACK_EVT 63  /*!< \brief LE set connection CTE receive parameters command complete */
-#define HCI_LE_SET_CONN_CTE_TX_PARAMS_CMD_CMPL_CBACK_EVT 64  /*!< \brief LE set connection CTE transmit parameters command complete */
-#define HCI_LE_CONN_CTE_REQ_ENABLE_CMD_CMPL_CBACK_EVT    65  /*!< \brief LE connection CTE request enable command complete */
-#define HCI_LE_CONN_CTE_RSP_ENABLE_CMD_CMPL_CBACK_EVT    66  /*!< \brief LE connection CTE response enable  command complete */
-#define HCI_LE_READ_ANTENNA_INFO_CMD_CMPL_CBACK_EVT      67  /*!< \brief LE read antenna information command complete */
-#define HCI_LE_CIS_EST_CBACK_EVT                         68  /*!< \brief LE CIS established event */
-#define HCI_LE_CIS_REQ_CBACK_EVT                         69  /*!< \brief LE CIS request event */
-#define HCI_CIS_DISCONNECT_CMPL_CBACK_EVT                70  /*!< \brief CIS disconnect complete */
-#define HCI_LE_REQ_PEER_SCA_CBACK_EVT                    71  /*!< \brief LE Request peer SCA complete */
-#define HCI_LE_SET_CIG_PARAMS_CMD_CMPL_CBACK_EVT         72  /*!< \brief LE set CIG parameters command complete */
-#define HCI_LE_REMOVE_CIG_CMD_CMPL_CBACK_EVT             73  /*!< \brief LE remove CIG command complete */
-#define HCI_LE_SETUP_ISO_DATA_PATH_CMD_CMPL_CBACK_EVT    74  /*!< \brief LE setup ISO data path command complete */
-#define HCI_LE_REMOVE_ISO_DATA_PATH_CMD_CMPL_CBACK_EVT   75  /*!< \brief LE remove ISO data path command complete */
-#define HCI_CONFIG_DATA_PATH_CMD_CMPL_CBACK_EVT          76  /*!< \brief Configure data path command complete */
-#define HCI_READ_LOCAL_SUP_CODECS_CMD_CMPL_CBACK_EVT     77  /*!< \brief Read local supported codecs command complete */
-#define HCI_READ_LOCAL_SUP_CODEC_CAP_CMD_CMPL_CBACK_EVT  78  /*!< \brief Read local supported codec capabilities command complete */
-#define HCI_READ_LOCAL_SUP_CTR_DLY_CMD_CMPL_CBACK_EVT    79  /*!< \brief Read local supported controller delay command complete */
-#define HCI_LE_CREATE_BIG_CMPL_CBACK_EVT                 80  /*!< \brief LE create BIG complete */
-#define HCI_LE_TERM_BIG_CMPL_CBACK_EVT                   81  /*!< \brief LE terminate BIG complete */
-#define HCI_LE_BIG_SYNC_EST_CBACK_EVT                    82  /*!< \brief LE BIG sync established */
-#define HCI_LE_BIG_SYNC_LOST_CBACK_EVT                   83  /*!< \brief LE BIG sync lost */
-#define HCI_LE_BIG_TERM_SYNC_CMPL_CBACK_EVT              84  /*!< \brief LE BIG terminate sync complete */
-#define HCI_LE_BIG_INFO_ADV_REPORT_CBACK_EVT             85  /*!< \brief LE BIG Info advertising report */
-#define HCI_LE_CONNLESS_IQ_REPORT_CBACK_EVT              86  /*!< \brief LE connectioness IQ report event */
+enum hci_cback_evt
+{
+  HCI_RESET_SEQ_CMPL_CBACK_EVT                        = 0 , /*!< \brief Reset sequence complete */
+  HCI_LE_CONN_CMPL_CBACK_EVT                          = 1 , /*!< \brief LE connection complete */
+  HCI_LE_ENHANCED_CONN_CMPL_CBACK_EVT                 = 2 , /*!< \brief LE enhanced connection complete */
+  HCI_DISCONNECT_CMPL_CBACK_EVT                       = 3 , /*!< \brief Disconnect complete */
+  HCI_LE_CONN_UPDATE_CMPL_CBACK_EVT                   = 4 , /*!< \brief LE connection update complete */
+  HCI_LE_CREATE_CONN_CANCEL_CMD_CMPL_CBACK_EVT        = 5 , /*!< \brief LE create connection cancel command complete */
+  HCI_LE_ADV_REPORT_CBACK_EVT                         = 6 , /*!< \brief LE advertising report */
+  HCI_READ_RSSI_CMD_CMPL_CBACK_EVT                    = 7 , /*!< \brief Read RSSI command complete */
+  HCI_LE_READ_CHAN_MAP_CMD_CMPL_CBACK_EVT             = 8 , /*!< \brief LE Read channel map command complete */
+  HCI_READ_TX_PWR_LVL_CMD_CMPL_CBACK_EVT              = 9 , /*!< \brief Read transmit power level command complete */
+  HCI_READ_REMOTE_VER_INFO_CMPL_CBACK_EVT             = 10, /*!< \brief Read remote version information complete */
+  HCI_LE_READ_REMOTE_FEAT_CMPL_CBACK_EVT              = 11, /*!< \brief LE read remote features complete */
+  HCI_LE_LTK_REQ_REPL_CMD_CMPL_CBACK_EVT              = 12, /*!< \brief LE LTK request reply command complete */
+  HCI_LE_LTK_REQ_NEG_REPL_CMD_CMPL_CBACK_EVT          = 13, /*!< \brief LE LTK request negative reply command complete */
+  HCI_ENC_KEY_REFRESH_CMPL_CBACK_EVT                  = 14, /*!< \brief Encryption key refresh complete */
+  HCI_ENC_CHANGE_CBACK_EVT                            = 15, /*!< \brief Encryption change */
+  HCI_LE_LTK_REQ_CBACK_EVT                            = 16, /*!< \brief LE LTK request */
+  HCI_VENDOR_SPEC_CMD_STATUS_CBACK_EVT                = 17, /*!< \brief Vendor specific command status */
+  HCI_VENDOR_SPEC_CMD_CMPL_CBACK_EVT                  = 18, /*!< \brief Vendor specific command complete */
+  HCI_VENDOR_SPEC_CBACK_EVT                           = 19, /*!< \brief Vendor specific */
+  HCI_HW_ERROR_CBACK_EVT                              = 20, /*!< \brief Hardware error */
+  HCI_LE_ADD_DEV_TO_RES_LIST_CMD_CMPL_CBACK_EVT       = 21, /*!< \brief LE add device to resolving list command complete */
+  HCI_LE_REM_DEV_FROM_RES_LIST_CMD_CMPL_CBACK_EVT     = 22, /*!< \brief LE remove device from resolving command complete */
+  HCI_LE_CLEAR_RES_LIST_CMD_CMPL_CBACK_EVT            = 23, /*!< \brief LE clear resolving list command complete */
+  HCI_LE_READ_PEER_RES_ADDR_CMD_CMPL_CBACK_EVT        = 24, /*!< \brief LE read peer resolving address command complete */
+  HCI_LE_READ_LOCAL_RES_ADDR_CMD_CMPL_CBACK_EVT       = 25, /*!< \brief LE read local resolving address command complete */
+  HCI_LE_SET_ADDR_RES_ENABLE_CMD_CMPL_CBACK_EVT       = 26, /*!< \brief LE set address resolving enable command complete */
+  HCI_LE_ENCRYPT_CMD_CMPL_CBACK_EVT                   = 27, /*!< \brief LE encrypt command complete */
+  HCI_LE_RAND_CMD_CMPL_CBACK_EVT                      = 28, /*!< \brief LE rand command complete */
+  HCI_LE_REM_CONN_PARAM_REP_CMD_CMPL_CBACK_EVT        = 29, /*!< \brief LE remote connection parameter request reply complete */
+  HCI_LE_REM_CONN_PARAM_NEG_REP_CMD_CMPL_CBACK_EVT    = 30, /*!< \brief LE remote connection parameter request negative reply complete */
+  HCI_LE_READ_DEF_DATA_LEN_CMD_CMPL_CBACK_EVT         = 31, /*!< \brief LE read suggested default data length command complete */
+  HCI_LE_WRITE_DEF_DATA_LEN_CMD_CMPL_CBACK_EVT        = 32, /*!< \brief LE write suggested default data length command complete */
+  HCI_LE_SET_DATA_LEN_CMD_CMPL_CBACK_EVT              = 33, /*!< \brief LE set data length command complete */
+  HCI_LE_READ_MAX_DATA_LEN_CMD_CMPL_CBACK_EVT         = 34, /*!< \brief LE read maximum data length command complete */
+  HCI_LE_REM_CONN_PARAM_REQ_CBACK_EVT                 = 35, /*!< \brief LE remote connection parameter request */
+  HCI_LE_DATA_LEN_CHANGE_CBACK_EVT                    = 36, /*!< \brief LE data length change */
+  HCI_LE_READ_LOCAL_P256_PUB_KEY_CMPL_CBACK_EVT       = 37, /*!< \brief LE read local P-256 public key */
+  HCI_LE_GENERATE_DHKEY_CMPL_CBACK_EVT                = 38, /*!< \brief LE generate DHKey complete */
+  HCI_WRITE_AUTH_PAYLOAD_TO_CMD_CMPL_CBACK_EVT        = 39, /*!< \brief Write authenticated payload timeout command complete */
+  HCI_AUTH_PAYLOAD_TO_EXPIRED_CBACK_EVT               = 40, /*!< \brief Authenticated payload timeout expired event */
+  HCI_LE_READ_PHY_CMD_CMPL_CBACK_EVT                  = 41, /*!< \brief LE read phy command complete */
+  HCI_LE_SET_DEF_PHY_CMD_CMPL_CBACK_EVT               = 42, /*!< \brief LE set default phy command complete */
+  HCI_LE_PHY_UPDATE_CMPL_CBACK_EVT                    = 43, /*!< \brief LE phy update complete */
+  HCI_LE_EXT_ADV_REPORT_CBACK_EVT                     = 44, /*!< \brief LE extended advertising report */
+  HCI_LE_SCAN_TIMEOUT_CBACK_EVT                       = 45, /*!< \brief LE scan timeout event */
+  HCI_LE_ADV_SET_TERM_CBACK_EVT                       = 46, /*!< \brief LE advertising set terminated event */
+  HCI_LE_SCAN_REQ_RCVD_CBACK_EVT                      = 47, /*!< \brief LE scan request received event */
+  HCI_LE_PER_ADV_SYNC_EST_CBACK_EVT                   = 48, /*!< \brief LE periodic advertising sync established event */
+  HCI_LE_PER_ADV_REPORT_CBACK_EVT                     = 49, /*!< \brief LE periodic advertising report event */
+  HCI_LE_PER_ADV_SYNC_LOST_CBACK_EVT                  = 50, /*!< \brief LE periodic advertising synch lost event */
+  HCI_LE_CH_SEL_ALGO_CBACK_EVT                        = 51, /*!< \brief LE channel selection algorithm event */
+  HCI_LE_SCAN_ENABLE_CMD_CMPL_CBACK_EVT               = 52, /*!< \brief LE scan enable command complete  */
+  HCI_LE_ADV_ENABLE_CMD_CMPL_CBACK_EVT                = 53, /*!< \brief LE advertise enable command complete  */
+  HCI_LE_EXT_SCAN_ENABLE_CMD_CMPL_CBACK_EVT           = 54, /*!< \brief LE extended scan enable command complete  */
+  HCI_LE_EXT_ADV_ENABLE_CMD_CMPL_CBACK_EVT            = 55, /*!< \brief LE extended advertise enable command complete  */
+  HCI_LE_PER_ADV_ENABLE_CMD_CMPL_CBACK_EVT            = 56, /*!< \brief LE periodic advertise enable command complete  */
+  HCI_LE_SET_RAND_ADDR_CMD_CMPL_CBACK_EVT             = 57, /*!< \brief LE set random address command complete  */
+  HCI_LE_PER_SYNC_TRSF_RCVD_CBACK_EVT                 = 58, /*!< \brief LE periodic advertising sync transfer received event */
+  HCI_LE_PER_ADV_SYNC_TRSF_CMD_CMPL_CBACK_EVT         = 59, /*!< \brief LE periodic advertising sync transfer command complete  */
+  HCI_LE_PER_ADV_SET_INFO_TRSF_CMD_CMPL_CBACK_EVT     = 60, /*!< \brief LE set periodic advertising set info transfer command complete  */
+  HCI_LE_CONN_IQ_REPORT_CBACK_EVT                     = 61, /*!< \brief LE connection IQ report event */
+  HCI_LE_CTE_REQ_FAILED_CBACK_EVT                     = 62, /*!< \brief LE CTE request failed event */
+  HCI_LE_SET_CONN_CTE_RX_PARAMS_CMD_CMPL_CBACK_EVT    = 63, /*!< \brief LE set connection CTE receive parameters command complete */
+  HCI_LE_SET_CONN_CTE_TX_PARAMS_CMD_CMPL_CBACK_EVT    = 64, /*!< \brief LE set connection CTE transmit parameters command complete */
+  HCI_LE_CONN_CTE_REQ_ENABLE_CMD_CMPL_CBACK_EVT       = 65, /*!< \brief LE connection CTE request enable command complete */
+  HCI_LE_CONN_CTE_RSP_ENABLE_CMD_CMPL_CBACK_EVT       = 66, /*!< \brief LE connection CTE response enable  command complete */
+  HCI_LE_READ_ANTENNA_INFO_CMD_CMPL_CBACK_EVT         = 67, /*!< \brief LE read antenna information command complete */
+  HCI_LE_CIS_EST_CBACK_EVT                            = 68, /*!< \brief LE CIS established event */
+  HCI_LE_CIS_REQ_CBACK_EVT                            = 69, /*!< \brief LE CIS request event */
+  HCI_CIS_DISCONNECT_CMPL_CBACK_EVT                   = 70, /*!< \brief CIS disconnect complete */
+  HCI_LE_REQ_PEER_SCA_CBACK_EVT                       = 71, /*!< \brief LE Request peer SCA complete */
+  HCI_LE_SET_CIG_PARAMS_CMD_CMPL_CBACK_EVT            = 72, /*!< \brief LE set CIG parameters command complete */
+  HCI_LE_REMOVE_CIG_CMD_CMPL_CBACK_EVT                = 73, /*!< \brief LE remove CIG command complete */
+  HCI_LE_SETUP_ISO_DATA_PATH_CMD_CMPL_CBACK_EVT       = 74, /*!< \brief LE setup ISO data path command complete */
+  HCI_LE_REMOVE_ISO_DATA_PATH_CMD_CMPL_CBACK_EVT      = 75, /*!< \brief LE remove ISO data path command complete */
+  HCI_CONFIG_DATA_PATH_CMD_CMPL_CBACK_EVT             = 76, /*!< \brief Configure data path command complete */
+  HCI_READ_LOCAL_SUP_CODECS_CMD_CMPL_CBACK_EVT        = 77, /*!< \brief Read local supported codecs command complete */
+  HCI_READ_LOCAL_SUP_CODEC_CAP_CMD_CMPL_CBACK_EVT     = 78, /*!< \brief Read local supported codec capabilities command complete */
+  HCI_READ_LOCAL_SUP_CTR_DLY_CMD_CMPL_CBACK_EVT       = 79, /*!< \brief Read local supported controller delay command complete */
+  HCI_LE_CREATE_BIG_CMPL_CBACK_EVT                    = 80, /*!< \brief LE create BIG complete */
+  HCI_LE_TERM_BIG_CMPL_CBACK_EVT                      = 81, /*!< \brief LE terminate BIG complete */
+  HCI_LE_BIG_SYNC_EST_CBACK_EVT                       = 82, /*!< \brief LE BIG sync established */
+  HCI_LE_BIG_SYNC_LOST_CBACK_EVT                      = 83, /*!< \brief LE BIG sync lost */
+  HCI_LE_BIG_TERM_SYNC_CMPL_CBACK_EVT                 = 84, /*!< \brief LE BIG terminate sync complete */
+  HCI_LE_BIG_INFO_ADV_REPORT_CBACK_EVT                = 85, /*!< \brief LE BIG Info advertising report */
+  HCI_LE_CONNLESS_IQ_REPORT_CBACK_EVT                 = 86, /*!< \brief LE connectioness IQ report event */
+#if (BT_53)
+  HCI_LE_SUBRATE_CHANGE_CBACK_EVT,                         /*!< \brief LE Subrate change event */
+#endif // BT_53
+
+#if (BT_54)
+  HCI_LE_PER_ADV_SUBEVT_DATA_REQ_CBACK_EVT,                /*!< \brief  LE Periodic Advertising Subevent Data Request event*/
+  HCI_LE_PER_ADV_RSP_REPORT_CBACK_EVT,                     /*!< \brief  LE Periodic Advertising Response Report event*/
+#endif
+
+  HCI_LE_END_OF_CBACK_EVT                                  /*!< \bried End of valid HCI LE callback event */
+};
 /**@}*/
 
 /**************************************************************************************************
@@ -156,6 +170,10 @@ typedef struct
   /* \brief enhanced fields */
   bdAddr_t            localRpa;      /*!< \brief Local RPA. */
   bdAddr_t            peerRpa;       /*!< \brief Peer RPA. */
+#if (BT_54)
+  uint8_t             advHandle;    /*!< \brief Identify an advertising set. */
+  uint16_t            syncHandle;   /*!< \brief Identifying the periodic advertising train. */
+#endif // BT_54
 } hciLeConnCmplEvt_t;
 
 /*! \brief Disconnect complete event */
@@ -257,6 +275,12 @@ typedef struct
   uint8_t       advPhy;         /*!< \brief Advertiser PHY. */
   uint16_t      perAdvInterval; /*!< \brief Periodic advertising interval. */
   uint8_t       clockAccuracy;  /*!< \brief Advertiser clock accuracy. */
+#if (BT_54)
+  uint8_t       numSubEvt;      /*!< \brief Number of subevents.. */
+  uint8_t       subEvtInt;      /*!< \brief Subevent interval. */
+  uint8_t       rspSlotDelay;   /*!< \brief Response slot delay. */
+  uint8_t       rspSlotSpacing; /*!< \brief Response slot spacing. */
+#endif // BT_54
 } hciLePerAdvSyncEstEvt_t;
 
 /*! \brief LE periodic advertising report */
@@ -266,7 +290,11 @@ typedef struct
   uint16_t      syncHandle;     /*!< \brief Sync handle. */
   uint8_t       txPower;        /*!< \brief Tx power. */
   uint8_t       rssi;           /*!< \brief RSSI. */
-  uint8_t       unused;         /*!< \brief Intended to be used in a future feature. */
+  uint8_t       cteType;        /*!< \brief  the type of Constant Tone Extension in the periodic advertising packet. */
+#if (BT_54)
+  uint16_t      evtCnt;         /*!< \brief Periodic Event Counter. */
+  uint8_t       subEvt;         /*!< \brief The subevent number. */
+#endif // BT_54
   uint8_t       status;         /*!< \brief Data status. */
   uint16_t      len;            /*!< \brief Data buffer length. */
   uint8_t       *pData;         /*!< \brief Data buffer. */
@@ -293,6 +321,12 @@ typedef struct
   uint8_t       advPhy;         /*!< \brief Advertiser PHY. */
   uint16_t      perAdvInterval; /*!< \brief Periodic advertising interval. */
   uint8_t       clockAccuracy;  /*!< \brief Advertiser clock accuracy. */
+#if (BT_54)
+  uint8_t       numSubEvt;      /*!< \brief Number of subevents. */
+  uint8_t       subEvtInt;      /*!< \brief Subevent interval. */
+  uint8_t       rspSlotDelay;   /*!< \brief Response slot delay. */
+  uint8_t       rspSlotSpacing; /*!< \brief Response slot spacing. */
+#endif // BT_54
 } HciLePerAdvSyncTrsfRcvdEvt_t;
 
 /*! \brief LE channel selection algorithm */
@@ -935,6 +969,51 @@ typedef struct
   uint16_t            lmpSubversion;        /*!< \brief LMP Sub-version. */
 } hciLocalVerInfo_t;
 
+#if (BT_53)
+/*! \brief LE subrate update event */
+typedef struct
+{
+  wsfMsgHdr_t         hdr;                  /*!< \brief Event header. */
+  uint8_t             status;               /*!< \brief Status. */
+  uint16_t            handle;               /*!< \brief Connection handle. */
+  uint16_t            subrateFactor;        /*!< \brief Subrate factor (N x con intv). */
+  uint16_t            periphLatency;        /*!< \brief Peripheral latency (N x con evts). */
+  uint16_t            contNum;              /*!< \brief Continuation number (N x con evts). */
+  uint16_t            supTimeout;           /*!< \brief Supervision timeout (N x 10ms). */
+} hciLeSubrateChangeEvt_t;
+#endif // BT_53
+
+#if (BT_54)
+typedef struct {
+  wsfMsgHdr_t         hdr;                  /*!< \brief Event header. */
+  uint8_t             advHandle;            /*!< \brief Advertising handle. */
+  uint8_t             subevtStart;          /*!< \brief First subevent that data is requested for. */
+  uint8_t             subevtDataCnt;        /*!< \brief Number of subevents that data is requested for. */
+} hciLePerAdvSubevtDataReqEvt_t;
+
+/*! \brief LE periodic advertising response report */
+typedef struct
+{
+  int8_t              txPower;        /*!< \brief Tx Power. */
+  int8_t              rssi;           /*!< \brief RSSI. */
+  uint8_t             cteType;        /*!< \brief CTE type. */
+  uint8_t             rspSlot;        /*!< \brief The response slot the data was received in. */
+  uint8_t             dataStatus;     /*!< \brief Data satus. */
+  uint8_t             dataLen;        /*!< \brief Length of the Data field. */
+  uint8_t             *pData;         /*!< \brief Periodic advertising response data. */
+} hciLePerAdvRsp_t;
+
+typedef struct
+{
+  wsfMsgHdr_t         hdr;            /*!< \brief Event header. */
+  uint8_t             advHandle;      /*!< \brief Used to identify a periodic advertising train. */
+  uint8_t             subEvent;       /*!< \brief The subevent number. */
+  uint8_t             txStatus;       /*!< \brief AUX_SYNC_SUBEVENT_IND packet was transmitted or not. */
+  uint8_t             numResponses;   /*!< \brief Number of responses in event. */
+  hciLePerAdvRsp_t    perAdvRsp;
+} hciLePerAdvRspReportEvt_t;
+#endif // BT_54
+
 /*! \brief Union of all event types */
 typedef union
 {
@@ -1017,6 +1096,13 @@ typedef union
   HciLeBigSyncLostEvt_t               leBigSyncLost;               /*!< \brief LE BIG sync lost. */
   HciLeBigTermSyncCmplEvt_t           leBigTermSyncCmpl;           /*!< \brief LE BIG terminate sync complete. */
   HciLeBigInfoAdvRptEvt_t             leBigInfoAdvRpt;             /*!< \brief LE BIG info advertising report. */
+#if (BT_53)
+  hciLeSubrateChangeEvt_t             leSubrateChange;             /*!< \brief LE Subrate Chnage. */
+#endif // BT_53
+
+#if (BT_54)
+  hciLePerAdvSubevtDataReqEvt_t       lePerAdvSubevtDataReq;       /*!< \brief LE Periodic Advertising Subevent Data Request event*/
+#endif // BT_54
 } hciEvt_t;
 
 /*! \} */    /* STACK_HCI_EVT_API */
@@ -1038,6 +1124,10 @@ typedef struct
 /*! \brief Initiating parameters */
 typedef struct
 {
+#if (BT_54)
+  uint8_t             advHandle;       /*!< \brief Advertising_Handle identifying the periodic advertising train. */
+  uint8_t             subEvent;        /*!< \brief Subevent where the connection request is to be sent. */
+#endif // BT_54
   uint8_t             filterPolicy;    /*!< \brief Scan filter policy. */
   uint8_t             ownAddrType;     /*!< \brief Address type used by this device. */
   uint8_t             peerAddrType;    /*!< \brief Address type used for peer device. */
@@ -1241,6 +1331,111 @@ typedef struct
   uint8_t             *pCodecConfig;   /*!< \brief Codec-specific configuration data. */
 } HciReadLocalSupControllerDly_t;
 
+#if (BT_53)
+/*! \brief LE Set Default Subrate */
+typedef struct
+{
+  uint16_t            subrateMin;      /*!< \brief Minimum Subrate Factor. */
+  uint16_t            subrateMax;      /*!< \brief Maximum Subrate Factor. */
+  uint16_t            maxLatency;      /*!< \brief Maximum Peripheral latency. */
+  uint16_t            contNum;         /*!< \brief Continuation number. */
+  uint16_t            supTimeout;      /*!< \brief Supervision timeout. */
+} hciLeSetDefaultSubrate_t;
+
+/*! \brief LE Subrate Request */
+typedef struct
+{
+  uint16_t            subrateMin;      /*!< \brief Minimum Subrate Factor. */
+  uint16_t            subrateMax;      /*!< \brief Maximum Subrate Factor. */
+  uint16_t            maxLatency;      /*!< \brief Maximum Peripheral latency. */
+  uint16_t            contNum;         /*!< \brief Continuation number. */
+  uint16_t            supTimeout;      /*!< \brief Supervision timeout. */
+} hciLeSubrateReq_t;
+
+#endif // BT_53
+
+#if (BT_54)
+/*! \brief Extended advertising parameters version 2 */
+typedef struct
+{
+  uint16_t            advEventProp;    /*!< \brief Advertising Event Properties. */
+  uint32_t            priAdvInterMin;  /*!< \brief Primary Advertising Interval Minimum. */
+  uint32_t            priAdvInterMax;  /*!< \brief Primary Advertising Interval Maximum. */
+  uint8_t             priAdvChanMap;   /*!< \brief Primary Advertising Channel Map. */
+  uint8_t             ownAddrType;     /*!< \brief Own Address Type. */
+  uint8_t             peerAddrType;    /*!< \brief Peer Address Type. */
+  uint8_t             *pPeerAddr;      /*!< \brief Peer Address. */
+  uint8_t             advFiltPolicy;   /*!< \brief Advertising Filter Policy. */
+  int8_t              advTxPwr;        /*!< \brief Advertising Tx Power. */
+  uint8_t             priAdvPhy;       /*!< \brief Primary Advertising PHY. */
+  uint8_t             secAdvMaxSkip;   /*!< \brief Secondary Advertising Maximum Skip. */
+  uint8_t             secAdvPhy;       /*!< \brief Secondary Advertising PHY. */
+  uint8_t             advSID;          /*!< \brief Advertising SID. */
+  uint8_t             scanReqNotifEna; /*!< \brief Scan Request Notification Enable. */
+  uint8_t             priAdvPhyOpt;    /*!< \brief Primary Advertising PHY Options . */
+  uint8_t             secAdvPhyOpt;    /*!< \brief Secondary Advertising PHY Options. */
+} hciExtAdvParamV2_t;
+
+/*! \brief periodic advertising parameters version 2 */
+typedef struct
+{
+  uint16_t            advIntervalMin;   /*!< \brief Minimum periodic advertising interval. */
+  uint16_t            advIntervalMax;   /*!< \brief Maximum periodic advertising interval. */
+  uint16_t            advProps;         /*!< \brief Periodic advertising property, indicates which fields should be included in the advertising packet.*/
+  uint8_t             numSubEvents;     /*!< \brief Number of subevents, If zero, the periodic advertiser will be a broadcaster, without responses.*/
+  uint8_t             subEventInterval; /*!< \brief Interval between subevents (N * 1.25 ms), shall be between 7.5ms and 318.75 ms.*/
+  uint8_t             respSlotDelay;    /*!< \brief Time between the advertising packet in a subevent and the first response slot (N * 1.25 ms) */
+  uint8_t             respSlotSpacing;  /*!< \brief Periodic advertising state. Time between response slots (N * 0.125 ms), shall be between 0.25 and 31.875 ms.*/
+  uint8_t             numRespSlots;     /*!< \brief Number of subevent response slots,  If zero, response_slot_delay and response_slot_spacing are ignored.*/
+}hciPerAdvParamV2_t;
+
+// Maximum length of subevent data
+#define SUBEVENT_DATA_LEN_MAX         (251)
+
+/*! \brief periodic advertising subevent data */
+typedef struct
+{
+  uint8_t              subEvt;          /*!< \brief Subevent index of data (range 0x00 - 0x7F). */
+  uint8_t              rspSlotStart;    /*!< \brief First response slot to be used in the subevent. */
+  uint8_t              rspSlotCnt;      /*!< \brief Number of response slots to be used. */
+  uint8_t              subEvtDataLen;   /*!< \brief Subevent data length in octets (range 0 - 251). */
+  uint8_t              subEvtData[SUBEVENT_DATA_LEN_MAX];   /*!< \brief Subevent data. */
+} __attribute__ ((__packed__))hciPerAdvSubEvtDataSetElem_t;
+
+typedef struct
+{
+	uint8_t adv_handle;
+	uint8_t num_subevents;
+	hciPerAdvSubEvtDataSetElem_t subevents[];
+}__attribute__ ((__packed__))hciPerAdvSubEvtDataSet_t;
+
+// Maximum length of periodic advertising response data
+#define PER_ADV_RSP_DATA_LEN_MAX         (251)
+
+/*! \brief Set Periodic Advertising Response Data command */
+typedef struct
+{
+  uint16_t             syncHandle;      /*!< \brief Identifying the PAwR train. */
+  uint16_t             requestEvent;    /*!< \brief The value of paEventCounter for the periodic advertising packet that the Host is responding to. */
+  uint8_t              requestSubEvt;   /*!< \brief The subevent for the periodic advertising packet that the Host is responding to. */
+  uint8_t              responseSubEvt;  /*!< \brief Identify the subevent of the PAwR train. */
+  uint8_t              responseSlot;    /*!< \brief Identify the response slot of the PAwR train. */
+  uint8_t              responseDataLen; /*!< \brief The number of octets in the Response_Data parameter. */
+  uint8_t              responseData[PER_ADV_RSP_DATA_LEN_MAX];   /*!< \brief Response data . */
+} hciPerAdvRspData_t;
+
+// Maximum length of subevent
+#define SUBEVENT_NUM_MAX         (0x7F)
+
+/*! \brief Set periodic sync subevent command */
+typedef struct
+{
+  uint16_t             syncHandle;      /*!< \brief Identifying the PAwR train. */
+  uint16_t             perAdvProp;      /*!< \brief Periodic advertising properties. */
+  uint8_t              numSubEvents;    /*!< \brief Number of subevents.*/
+  uint8_t              subEvents[SUBEVENT_NUM_MAX]; /*< \brief The subevent to synchronize with.*/
+} hciPerSyncSubEvtSet_t;
+#endif // BT_54
 /*! \} */    /* STACK_HCI_CMD_API */
 
 /**************************************************************************************************
@@ -3126,6 +3321,95 @@ void HciReadLocalSupControllerDlyCmd(HciReadLocalSupControllerDly_t *pDelayParam
 /*************************************************************************************************/
 void HciLeSetHostFeatureCmd(uint8_t bitNum, bool_t bitVal);
 
+#if (BT_53)
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE Set Default Subrate command.
+ *
+ *  \param      pSubrateParam      Default subrate parameters.
+ *
+ *  \return     None.
+ */
+/*************************************************************************************************/
+void HciLeSetDefaultSubrateCmd(hciLeSetDefaultSubrate_t *pSubrateParam);
+
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE Subrate request command.
+ *
+ *  \param      handle            Connection handle.
+ *  \param      pSubrateParam     Request subrate parameters.
+ *
+ *  \return     None.
+ */
+/*************************************************************************************************/
+void HciLeSubrateReqCmd(uint16_t handle, hciLeSubrateReq_t *pSubrateParam);
+
+#endif // BT_53
+
+#if (BT_54)
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE set extended advertising parameters version 2 command.
+ *
+ *  \param      advHandle         Advertising handle.
+ *  \param      pExtAdvParamV2    Extended advertising parameters.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void HciLeSetExtAdvParamCmdV2(uint8_t advHandle, hciExtAdvParamV2_t *pExtAdvParamV2);
+
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE set periodic advertising parameters version 2 command.
+ *
+ *  \param      advHandle       Advertising handle.
+ *  \param      pPerAdvParamV2  Periodic advertising parameters version 2.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void HciLeSetPerAdvParamCmdV2(uint8_t advHandle, hciPerAdvParamV2_t* pPerAdvParamV2);
+
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE set periodic advertising subevent data command.
+ *
+ *  \param      advHandle          Advertising handle.
+ *  \param      numSubEvt          Number of subevent data in the command.
+ *  \param      pPerAdvSbuEvtData  Periodic advertising subevent data structure.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void HciLeSetPerAdvSubEvtDataCmd(uint8_t advHandle, uint8_t numSubEvt, hciPerAdvSubEvtDataSetElem_t* pPerAdvSbuEvtData);
+
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE set periodic advertising response data command.
+ *
+ *  \param      advHandle          Advertising handle.
+ *  \param      pPerAdvRspData     Pointer to hciPerAdvRspData_tstructure.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void HciLeSetPerAdvRspDataCmd(hciPerAdvRspData_t * pPerAdvRspData);
+
+/*************************************************************************************************/
+/*!
+ *  \brief      HCI LE Set Periodic Sync Subevent command.
+ *
+ *  \param
+ *  \param      pPerSyncSubEvt  pointer to hciPerSyncSubEvtSet_t structure.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void HciLeSetPerSyncSubEvtCmd(hciPerSyncSubEvtSet_t* pPerSyncSubEvt);
+
+#endif // BT_54
 
 /*! \} */    /* STACK_HCI_CMD_API */
 

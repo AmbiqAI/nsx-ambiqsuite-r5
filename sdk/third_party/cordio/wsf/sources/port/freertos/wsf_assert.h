@@ -65,7 +65,8 @@ void WsfAssert(const char *pFile, uint16_t line);
 #if WSF_ASSERT_ENABLED == TRUE
 #define WSF_CT_ASSERT(expr)     extern char wsf_ct_assert[(expr) ? 1 : -1]
 #else
-#define WSF_CT_ASSERT(expr)
+// Fix -Wpedantic "ISO C does not allow extra ';' outside of a function" warning
+#define WSF_CT_ASSERT(expr)     struct WsfNoCtAssert
 #endif
 
 #ifdef __cplusplus

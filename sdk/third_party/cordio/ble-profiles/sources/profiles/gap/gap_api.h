@@ -41,6 +41,11 @@ extern "C" {
 enum
 {
   GAP_CAR_HDL_IDX,          /*!< \brief Central Address Resolution */
+#if (BT_54)
+  GAP_EDKM_HDL_IDX,         /*!< \brief Encrypted Data Key Material */
+  GAP_EDKM_HDL_CCC_IDX,     /*!< \brief Encrypted Data Key Material CCC descriptor */
+  GAP_SL_HDL_IDX,           /*!< \brief LE GATT Security Levels */
+#endif // BT_54
   GAP_RPAO_HDL_IDX,         /*!< \brief Resolvable Private Address Only */
   GAP_HDL_LIST_LEN          /*!< \brief Handle list length */
 };

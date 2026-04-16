@@ -517,6 +517,57 @@ void AppDbSetPeerRpao(appDbHdl_t hdl, bool_t peerRpao);
 /*************************************************************************************************/
 void AppLoadResList(void);
 
+#if (BT_54)
+/*************************************************************************************************/
+/*!
+ *  \brief  Get the Encrypted Data Key Material for a given peer device.
+ *
+ *  \param  hdl         Database record handle.
+ *
+ *  \return sessionKey  The shared sessionKey.
+ *  \return iv          The initialization vector.
+ */
+/*************************************************************************************************/
+void AppDbGetPeerEdkm(appDbHdl_t hdl, uint8_t *sessionKey, uint8_t *iv);
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Set the Encrypted Data Key Material for a given peer device.
+ *
+ *  \param  hdl         Database record handle.
+ *  \param  sessionKey  The shared sessionKey.
+ *  \param  iv          The initialization vector.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void AppDbSetPeerEdkm(appDbHdl_t hdl, uint8_t *sessionKey, uint8_t *iv);
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Get the Encrypted Data Key Material valid flag.
+ *
+ *  \param  hdl  Database record handle.
+ *
+ *  \return TRUE if Encrypted data key material record is valid. FALSE, otherwise.
+ */
+/*************************************************************************************************/
+bool_t AppDbGetPeerEdkmValid(appDbHdl_t hdl);
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Set the Encrypted Data Key Material valid flag.
+ *
+ *  \param  hdl    Database record handle.
+ *  \param  valid  Set the Encrypted data key material record valid flag.
+ *
+ *  \return none.
+ */
+/*************************************************************************************************/
+void AppDbSetPeerEdkmValid(appDbHdl_t hdl, bool_t valid);
+
+#endif // BT_54
+
 /**@}*/
 
 /*! \} */    /*! APP_FRAMEWORK_DB_API */

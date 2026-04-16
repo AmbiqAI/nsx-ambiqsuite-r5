@@ -7,13 +7,13 @@
  *  Copyright (c) 2016-2018 Arm Ltd. All Rights Reserved.
  *
  *  Copyright (c) 2019 Packetcraft, Inc.
- *  
+ *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
- *  
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- *  
+ *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -311,6 +311,14 @@ void dmExtScanHciHandler(hciEvt_t *pEvent)
     /* call callback */
     (*dmCb.cback)((dmEvt_t *)pEvent);
   }
+  #if (BT_54)
+  else if (pEvent->hdr.event == HCI_LE_PER_ADV_RSP_REPORT_CBACK_EVT)
+  {
+    /* call callback */
+    pEvent->hdr.event = DM_PER_ADV_RSP_REPORT_IND;
+    (*dmCb.cback)((dmEvt_t *) pEvent);
+  }
+  #endif
 }
 
 /*************************************************************************************************/

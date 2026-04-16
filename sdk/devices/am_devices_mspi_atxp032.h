@@ -2,9 +2,9 @@
 //
 //! @file am_devices_mspi_atxp032.h
 //!
-//! @brief ATXP032 Multibit SPI Flash driver.
+//! @brief Multi-bit SPI Flash driver for the ATXP032 device.
 //!
-//! @addtogroup atxp032 ATXP032 MSPI Driver
+//! @addtogroup devices_mspi_atxp032 ATXP032 MSPI Flash Driver
 //! @ingroup devices
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 

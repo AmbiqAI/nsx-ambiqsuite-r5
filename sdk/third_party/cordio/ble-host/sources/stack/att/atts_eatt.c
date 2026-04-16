@@ -94,7 +94,7 @@ static uint8_t eattsGetFreeSlot(dmConnId_t connId, uint8_t priority, uint16_t da
       {
         if (!(pAttCcb->sccb[i].control & ATT_CCB_STATUS_RSP_PENDING))
         {
-          EATT_TRACE_INFO1("eattsGetFreeSlot: allocating slot: %#x", i + 1);
+          EATT_TRACE_INFO1("eattsGetFreeSlot: allocating slot: %x", i + 1);
           return i + 1;
         }
       }

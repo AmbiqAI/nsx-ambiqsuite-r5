@@ -2,9 +2,9 @@
 //
 //! @file am_hal_sysctrl.h
 //!
-//! @brief Functions for interfacing with the M4F system control registers
+//! @brief Functions for interfacing with the M55 system control registers
 //!
-//! @addtogroup sysctrl4 SYSCTRL - System Control
+//! @addtogroup sysctrl4_ap510 SYSCTRL - System Control
 //! @ingroup apollo510_hal
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef AM_HAL_SYSCTRL_H
@@ -63,6 +63,8 @@ extern "C"
 //*****************************************************************************
 #define AM_HAL_SYSCTRL_SLEEP_DEEP       true
 #define AM_HAL_SYSCTRL_SLEEP_NORMAL     false
+
+#define AM_HAL_SYSCTRL_SLEEP_DEEPMAX    AM_HAL_SYSCTRL_SLEEP_DEEP
 //! @}
 
 //*****************************************************************************
@@ -156,4 +158,3 @@ extern void am_hal_sysctrl_force_buck_active_in_deepsleep(bool bFrcBuckAct);
 //! @}
 //
 //*****************************************************************************
-

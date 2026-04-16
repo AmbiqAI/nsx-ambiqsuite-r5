@@ -2,9 +2,9 @@
 //
 //! @file am_devices_mb85rc256v.h
 //!
-//! @brief Fujitsu 256K I2C FRAM driver.
+//! @brief Device driver for AmbiqSuite peripheral.
 //!
-//! @addtogroup mb85rc256v MB85RC256V I2C FRAM driver
+//! @addtogroup devices_mb85rc256v AmbiqSuite Device Driver
 //! @ingroup devices
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -62,11 +62,11 @@ extern "C"
 //! @{
 //
 //*****************************************************************************
-#define AM_DEVICES_MB85RC256V_SLAVE_ID          0x50
-#define AM_DEVICES_MB85RC256V_RSVD_SLAVE_ID     0x7C
-#define AM_DEVICES_MB85RC256V_ID                0x0010A500
-#define AM_DEVICES_MB85RC64TA_ID                0x0058A300
-#define AM_DEVICES_MB85RC1MT_ID                 0x0058A700
+#define AM_DEVICES_MB85RC256V_PERIPHERAL_ID          0x50
+#define AM_DEVICES_MB85RC256V_RSVD_PERIPHERAL_ID     0x7C
+#define AM_DEVICES_MB85RC256V_ID                     0x0010A500
+#define AM_DEVICES_MB85RC64TA_ID                     0x0058A300
+#define AM_DEVICES_MB85RC1MT_ID                      0x0058A700
 //! @}
 
 //*****************************************************************************

@@ -2,13 +2,13 @@
 //
 //! @file am_devices_spipsram.h
 //!
-//! @brief General SPI PSRAM driver.
+//! @brief Generic SPI PSRAM driver.
 //!
-//! @addtogroup spipsram SPI PSRAM Driver
+//! @addtogroup devices_spipsram Generic SPI PSRAM Driver
 //! @ingroup devices
 //! @{
 //
-//**************************************************************************
+//*****************************************************************************
 
 //*****************************************************************************
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 

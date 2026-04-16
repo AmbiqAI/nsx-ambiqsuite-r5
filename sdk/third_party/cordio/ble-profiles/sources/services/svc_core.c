@@ -85,6 +85,28 @@ static const uint16_t gapLenCarCh = sizeof(gapValCarCh);
 static uint8_t gapValCar[] = {FALSE};
 static const uint16_t gapLenCar = sizeof(gapValCar);
 
+#if (BT_54)
+/* encrypted data key material characteristic */
+static const uint8_t gapValEdkmCh[] = {ATT_PROP_READ | ATT_PROP_INDICATE, UINT16_TO_BYTES(GAP_EDKM_HDL), UINT16_TO_BYTES(ATT_UUID_EDKM)};
+static const uint16_t gapLenEdkmCh = sizeof(gapValEdkmCh);
+
+/* encrypted data key material */
+static uint8_t gapValEdkm[CH_EDKM_KEY_LEN + CH_EDKM_IV_LEN] = {0};
+static const uint16_t gapLenEdkm = sizeof(gapValEdkm);
+
+/* encrypted data key material client characteristic configuration */
+static uint8_t gapValEdkmChCcc[] = {UINT16_TO_BYTES(0x0000)};
+static const uint16_t gapLenEdkmChCcc = sizeof(gapValEdkmChCcc);
+
+/* LE GATT security levels characteristic */
+static const uint8_t gapValSeclvlCh[] = {ATT_PROP_READ, UINT16_TO_BYTES(GAP_SL_HDL), UINT16_TO_BYTES(ATT_UUID_SEC_LEVEL)};
+static const uint16_t gapLenSeclvlCh = sizeof(gapValSeclvlCh);
+
+/* LE GATT security levels */
+static uint8_t gapValSeclvl[CH_SL_MAX_LEN] = {CH_SL_SEC_MODE_1, CH_SL_SEC_MODE_1_LEVEL_1};
+static uint16_t gapLenSeclvl = CH_SL_MIN_LEN;
+#endif // BT_54
+
 /* resolvable private address only characteristic */
 static const uint8_t gapValRpaoCh[] = {ATT_PROP_READ, UINT16_TO_BYTES(GAP_RPAO_HDL), UINT16_TO_BYTES(ATT_UUID_RPAO)};
 static const uint16_t gapLenRpaoCh = sizeof(gapValRpaoCh);
@@ -152,6 +174,48 @@ static const attsAttr_t gapList[] =
     0,
     ATTS_PERMIT_READ
   },
+#if (BT_54)
+  {
+    attChUuid,
+    (uint8_t *) gapValEdkmCh,
+    (uint16_t *) &gapLenEdkmCh,
+    sizeof(gapValEdkmCh),
+    0,
+    ATTS_PERMIT_READ
+  },
+  {
+    attEdkmChUuid,
+    gapValEdkm,
+    (uint16_t *) &gapLenEdkm,
+    sizeof(gapValEdkm),
+    0,
+    ATTS_PERMIT_READ
+  },
+  {
+    attCliChCfgUuid,
+    gapValEdkmChCcc,
+    (uint16_t *) &gapLenEdkmChCcc,
+    sizeof(gapValEdkmChCcc),
+    ATTS_SET_CCC,
+    (ATTS_PERMIT_READ | CORE_SEC_PERMIT_WRITE)
+  },
+  {
+    attChUuid,
+    (uint8_t *) gapValSeclvlCh,
+    (uint16_t *) &gapLenSeclvlCh,
+    sizeof(gapValSeclvlCh),
+    0,
+    ATTS_PERMIT_READ
+  },
+  {
+    attSeclvlChUuid,
+    gapValSeclvl,
+    (uint16_t *) &gapLenSeclvl,
+    sizeof(gapValSeclvl),
+    ATTS_SET_VARIABLE_LEN,
+    ATTS_PERMIT_READ
+  },
+#endif // BT_54
   {
     attChUuid,
     (uint8_t *) gapValRpaoCh,
@@ -424,3 +488,94 @@ void SvcCoreGattSetSsf(uint8_t value)
 {
   gattValSsf[0] = value;
 }
+
+#if (BT_54)
+/*************************************************************************************************/
+/*!
+ *  \brief  Update the Encrypted Data Key Material value.
+ *
+ *  \param  sessionKey   The shared session key.
+ *  \param  iv           The initialization vector.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void SvcCoreGapEdkmUpdate(uint8_t *sessionKey, uint8_t *iv)
+{
+  if ((sessionKey != NULL) && (iv != NULL))
+  {
+    memcpy(&gapValEdkm[0], sessionKey, CH_EDKM_KEY_LEN);
+    memcpy(&gapValEdkm[CH_EDKM_KEY_LEN], iv, CH_EDKM_IV_LEN);
+  }
+}
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Set the LE GATT security levels.
+ *
+ *  The LE GATT security levels characteristic can be more than one security mode and level
+ *  combination. Update the security level if the input security mode exists, otherwise add
+ *  the new security mode and level and update the characteristic value length.
+ *
+ *  \param  mode    The security mode.
+ *  \param  level   The security level.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void SvcCoreGapSetSeclvl(uint8_t mode, uint8_t level)
+{
+  switch (mode)
+  {
+    case CH_SL_SEC_MODE_1:
+      if ((level >= CH_SL_SEC_MODE_1_LEVEL_1) && (level <= CH_SL_SEC_MODE_1_LEVEL_4))
+      {
+        /* The first two bytes are for security mode 1 and its level */
+        gapValSeclvl[1] = level;
+      }
+    break;
+
+    case CH_SL_SEC_MODE_2:
+      if ((level >= CH_SL_SEC_MODE_2_LEVEL_1) && (level <= CH_SL_SEC_MODE_2_LEVEL_2))
+      {
+        if (gapValSeclvl[2] == CH_SL_SEC_MODE_3)
+        {
+          /* Add security mode 2 values since security 1,3 have been included */
+          gapValSeclvl[4] = mode;
+          gapValSeclvl[5] = level;
+          gapLenSeclvl = 6;
+        }
+        else
+        {
+          gapValSeclvl[2] = mode;
+          gapValSeclvl[3] = level;
+          gapLenSeclvl = 4;
+        }
+      }
+    break;
+
+    case CH_SL_SEC_MODE_3:
+      if ((level >= CH_SL_SEC_MODE_3_LEVEL_1) && (level <= CH_SL_SEC_MODE_3_LEVEL_3))
+      {
+        if (gapValSeclvl[2] == CH_SL_SEC_MODE_2)
+        {
+          /* Add security mode 3 values since security 1,2 have been included */
+          gapValSeclvl[4] = mode;
+          gapValSeclvl[5] = level;
+          gapLenSeclvl = 6;
+        }
+        else
+        {
+          gapValSeclvl[2] = mode;
+          gapValSeclvl[3] = level;
+          gapLenSeclvl = 4;
+        }
+      }
+    break;
+
+    default:
+    break;
+  }
+}
+
+#endif // BT_54

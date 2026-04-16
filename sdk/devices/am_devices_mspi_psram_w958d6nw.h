@@ -2,9 +2,9 @@
 //
 //! @file am_devices_mspi_psram_w958d6nw.h
 //!
-//! @brief Winbond MSPI PSRAM driver.
+//! @brief Winbond W958D6NW MSPI PSRAM driver
 //!
-//! @addtogroup mspi_psram_w958d6nw W958D6NW MSPI PSRAM Driver
+//! @addtogroup devices_mspi_psram_w958d6nw W958D6NW MSPI PSRAM Driver
 //! @ingroup devices
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 

@@ -25,6 +25,7 @@
 #ifndef SVC_CORE_H
 #define SVC_CORE_H
 
+#include "cfg_stack.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -71,6 +72,13 @@ enum
   GAP_AP_HDL,                       /*!< \brief Appearance */
   GAP_CAR_CH_HDL,                   /*!< \brief Central address resolution characteristic */
   GAP_CAR_HDL,                      /*!< \brief Central address resolution */
+#if (BT_54)
+  GAP_EDKM_CH_HDL,                  /*!< \brief Encrypted Data Key Material characteristic */
+  GAP_EDKM_HDL,                     /*!< \brief Encrypted Data Key Material */
+  GAP_EDKM_CH_CCC_HDL,              /*!< \brief Encrypted Data Key Material client characteristic configuration descriptor */
+  GAP_SL_CH_HDL,                    /*!< \brief LE GATT Security Levels characteristic */
+  GAP_SL_HDL,                       /*!< \brief LE GATT Security Levels */
+#endif // BT_54
   GAP_RPAO_CH_HDL,                  /*!< \brief Resolvable private address only characteristic */
   GAP_RPAO_HDL,                     /*!< \brief Resolvable private address only */
   GAP_MAX_HDL                       /*!< \brief GAP maximum handle */
@@ -175,6 +183,33 @@ void SvcCoreGapAddRpaoCh(void);
  */
 /*************************************************************************************************/
 void SvcCoreGattSetSsf(uint8_t value);
+
+#if (BT_54)
+/*************************************************************************************************/
+/*!
+ *  \brief  Update the Encrypted Data Key Material value.
+ *
+ *  \param  sessionKey   The shared session key.
+ *  \param  iv           The initialization vector.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void SvcCoreGapEdkmUpdate(uint8_t *sessionKey, uint8_t *iv);
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Set the LE GATT security levels.
+ *
+ *  \param  mode    The security mode.
+ *  \param  level   The security level.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void SvcCoreGapSetSeclvl(uint8_t mode, uint8_t level);
+
+#endif // BT_54
 
 /*! \} */    /* GATT_AND_GAP_SERVICE */
 

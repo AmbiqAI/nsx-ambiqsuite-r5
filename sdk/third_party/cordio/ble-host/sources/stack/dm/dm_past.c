@@ -7,13 +7,13 @@
  *  Copyright (c) 2018 Arm Ltd. All Rights Reserved.
  *
  *  Copyright (c) 2019 Packetcraft, Inc.
- *  
+ *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
- *  
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- *  
+ *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -150,10 +150,19 @@ void dmPastActRptRcvEnable(dmPastMsg_t *pMsg)
 {
   dmSyncCb_t *pScb;
 
+  uint8_t enable = (pMsg->hdr.status) ? TRUE : FALSE;
+
+#if (BT_53)
+  if(dmCb.syncOptions & HCI_OPTIONS_SYNC_DUP_FILT_BIT)
+  {
+    enable |= HCI_OPTIONS_SYNC_DUP_FILT_BIT;
+  }
+#endif // BT_53
+
   /* look up scb from sync id */
   if ((pScb = dmSyncCbById((dmSyncId_t) pMsg->hdr.param)) != NULL)
   {
-    HciLeSetPerAdvRcvEnableCmd(pScb->handle, (pMsg->hdr.status ? TRUE : FALSE));
+    HciLeSetPerAdvRcvEnableCmd(pScb->handle, enable);
   }
 }
 
@@ -384,3 +393,30 @@ void DmPastDefaultConfig(uint8_t mode, uint16_t skip, uint16_t syncTimeout, uint
     WsfMsgSend(dmCb.handlerId, pMsg);
   }
 }
+
+#if (BT_53)
+/*************************************************************************************************/
+/*!
+ *  \brief  DM enable or disable periodic advertising duplicate filtering
+ *
+ *  \param  enable   TRUE to enable duplicate filtering, FALSE to disable duplicate filtering.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmPastDupFiltEnable(bool_t enable)
+{
+  WsfTaskLock();
+  if (enable)
+  {
+    /* Enable periodic advertisement duplicate filtering */
+    dmCb.syncOptions |= HCI_OPTIONS_SYNC_DUP_FILT_BIT;
+  }
+  else
+  {
+    /* Disable periodic advertisement duplicate filtering */
+    dmCb.syncOptions &= ~HCI_OPTIONS_SYNC_DUP_FILT_BIT;
+  }
+  WsfTaskUnlock();
+}
+#endif // BT_53

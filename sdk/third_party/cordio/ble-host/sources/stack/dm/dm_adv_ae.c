@@ -7,13 +7,13 @@
  *  Copyright (c) 2016-2019 Arm Ltd. All Rights Reserved.
  *
  *  Copyright (c) 2019-2020 Packetcraft, Inc.
- *  
+ *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
- *  
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- *  
+ *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,6 +31,7 @@
 #include "dm_adv.h"
 #include "dm_dev.h"
 #include "dm_main.h"
+#include "hci_api.h"
 
 /**************************************************************************************************
   Macros
@@ -80,6 +81,11 @@ typedef struct
   bool_t              advDataSet;      /*!< TRUE if extended adv data has been set. */
   bool_t              scanDataSet;     /*!< TRUE if extended scan data has been set. */
   dmConnId_t          connId;          /*!< Connection identifier (used by directed advertising). */
+#if (BT_54)
+  bool_t              useV2;           /*!< Use Set Extended Advertising Parameters version 2 command. */
+  uint8_t             priAdvPhyOpt;    /*!< Primary Advertising PHY Options. */
+  uint8_t             secAdvPhyOpt;    /*!< Secondary Advertising PHY Options. */
+#endif // BT_54
 } dmExtAdvCb_t;
 
 /* Control block for periodic advertising module */
@@ -88,7 +94,17 @@ typedef struct
   uint16_t            intervalMin;     /*!< Minimum advertising interval. */
   uint16_t            intervalMax;     /*!< Maximum advertising interval. */
   bool_t              incTxPwr;        /*!< Include TxPower in extended header of advertising PDU. */
+#if (BT_53)
+  bool_t              incAdi;          /*!< Include ADI in extended header of advertising PDU. */
+#endif // BT_53
   uint8_t             advState;        /*!< Periodic advertising state. */
+#if (BT_54)
+  uint8_t numSubEvents;                /*!< Number of subevents, If zero, the periodic advertiser will be a broadcaster, without responses.*/
+  uint8_t subEventInterval;            /*!< Interval between subevents (N * 1.25 ms), shall be between 7.5ms and 318.75 ms.*/
+  uint8_t respSlotDelay;               /*!< Time between the advertising packet in a subevent and the first response slot (N * 1.25 ms) */
+  uint8_t respSlotSpacing;             /*!< Periodic advertising state. Time between response slots (N * 0.125 ms), shall be between 0.25 and 31.875 ms.*/
+  uint8_t numRespSlots;                /*!< Number of subevent response slots,  If zero, response_slot_delay and response_slot_spacing are ignored.*/
+#endif // BT_54
 } dmPerAdvCb_t;
 
 /**************************************************************************************************
@@ -122,7 +138,7 @@ static const dmAdvAct_t dmPerAdvAct[] =
   dmPerAdvActConfig,
   dmPerAdvActSetData,
   dmPerAdvActStart,
-  dmPerAdvActStop
+  dmPerAdvActStop,
 };
 
 /* periodic advertising component function interface */
@@ -175,6 +191,11 @@ static void dmExtAdvCbInit(uint8_t advHandle)
   dmExtAdvCb[advHandle].fragPref = HCI_ADV_DATA_FRAG_PREF_FRAG;
   dmExtAdvCb[advHandle].advSid = 0;
   dmExtAdvCb[advHandle].connId = DM_CONN_ID_NONE;
+#if (BT_54)
+  dmExtAdvCb[advHandle].useV2 = FALSE;
+  dmExtAdvCb[advHandle].priAdvPhyOpt = HCI_PHY_OPTIONS_NONE;
+  dmExtAdvCb[advHandle].secAdvPhyOpt = HCI_PHY_OPTIONS_NONE;
+#endif // BT_54
 }
 
 /*************************************************************************************************/
@@ -193,6 +214,17 @@ static void dmPerAdvCbInit(uint8_t advHandle)
   dmPerAdvCb[advHandle].intervalMax = DM_GAP_ADV_SLOW_INT_MAX;
   dmPerAdvCb[advHandle].incTxPwr = FALSE;
   dmPerAdvCb[advHandle].advState = DM_ADV_PER_STATE_IDLE;
+#if (BT_53)
+  dmPerAdvCb[advHandle].incAdi = FALSE;
+#endif // BT_53
+
+#if (BT_54)
+  dmPerAdvCb[advHandle].numSubEvents = HCI_PER_ADV_NUM_SUB_EVT_MIN;
+  dmPerAdvCb[advHandle].subEventInterval = HCI_PER_ADV_SUB_EVT_INT_MIN;
+  dmPerAdvCb[advHandle].respSlotDelay = HCI_PER_ADV_RSP_SLOT_DELAY_MIN;
+  dmPerAdvCb[advHandle].respSlotSpacing = HCI_PER_ADV_RSP_SLOT_PACE_MIN;
+  dmPerAdvCb[advHandle].numRespSlots = HCI_PER_ADV_RSP_NUM_RSP_SLOT_MIN;
+#endif // BT_54
 }
 
 /*************************************************************************************************/
@@ -513,8 +545,28 @@ static void dmAdvConfig(uint8_t advHandle, uint8_t advType, uint8_t peerAddrType
     dmExtAdvCb[advHandle].scanDataSet = FALSE;
   }
 
+#if (BT_54)
+  if (dmExtAdvCb[advHandle].useV2)
+  {
+    hciExtAdvParamV2_t extAdvParamV2;
+    memcpy(&extAdvParamV2, &extAdvParam, sizeof(hciExtAdvParam_t));
+    extAdvParamV2.priAdvPhyOpt = dmExtAdvCb[advHandle].priAdvPhyOpt;
+    extAdvParamV2.secAdvPhyOpt = dmExtAdvCb[advHandle].secAdvPhyOpt;
+
+    /* set extended advertising version 2 parameters */
+    HciLeSetExtAdvParamCmdV2(advHandle, &extAdvParamV2);
+
+    dmExtAdvCb[advHandle].useV2 = FALSE;
+  }
+  else
+  {
+    /* set extended advertising parameters */
+    HciLeSetExtAdvParamCmd(advHandle, &extAdvParam);
+  }
+#else
   /* set extended advertising parameters */
   HciLeSetExtAdvParamCmd(advHandle, &extAdvParam);
+#endif // BT_54
 
   /* store advertising type here till advertising's enabled */
   dmExtAdvCb[advHandle].advType = advType;
@@ -1026,11 +1078,20 @@ void dmExtAdvActSetRandAddr(dmAdvMsg_t *pMsg)
 /*************************************************************************************************/
 static void dmPerAdvStart(uint8_t advHandle)
 {
+  uint8_t enable = TRUE;
+
+#if (BT_53)
+  if(dmPerAdvCb[advHandle].incAdi)
+  {
+    enable |= HCI_LE_SET_PER_ADV_ENABLE_ADI;
+  }
+#endif // BT_53
+
   WSF_ASSERT(advHandle < DM_NUM_ADV_SETS)
 
   /* start periodic advertising */
   dmPerAdvCb[advHandle].advState = DM_ADV_PER_STATE_STARTING;
-  HciLeSetPerAdvEnableCmd(TRUE, advHandle);
+  HciLeSetPerAdvEnableCmd(enable, advHandle);
 }
 
 /*************************************************************************************************/
@@ -1118,9 +1179,24 @@ void dmPerAdvActConfig(dmAdvMsg_t *pMsg)
     advProps |= HCI_ADV_PROP_INC_TX_PWR_BIT;
   }
 
+  #if (BT_54)
+  hciPerAdvParamV2_t perAdvParamV2;
+
+  perAdvParamV2.advIntervalMin = dmPerAdvCb[advHandle].intervalMin;
+  perAdvParamV2.advIntervalMax = dmPerAdvCb[advHandle].intervalMax;
+  perAdvParamV2.advProps = advProps;
+  perAdvParamV2.numRespSlots = dmPerAdvCb[advHandle].numRespSlots;
+  perAdvParamV2.numSubEvents = dmPerAdvCb[advHandle].numSubEvents;
+  perAdvParamV2.respSlotDelay = dmPerAdvCb[advHandle].respSlotDelay;
+  perAdvParamV2.respSlotSpacing = dmPerAdvCb[advHandle].respSlotSpacing;
+  perAdvParamV2.subEventInterval = dmPerAdvCb[advHandle].subEventInterval;
+
+  HciLeSetPerAdvParamCmdV2(advHandle, &perAdvParamV2);
+  #else
   /* set periodic advertising parameters */
   HciLeSetPerAdvParamCmd(advHandle, dmPerAdvCb[advHandle].intervalMin,
                          dmPerAdvCb[advHandle].intervalMax, advProps);
+  #endif
 }
 
 /*************************************************************************************************/
@@ -1489,6 +1565,20 @@ void dmPerAdvHciHandler(hciEvt_t *pEvent)
       DM_TRACE_WARN0("dmPerAdvHciHandler ignored due to no pending enable command complete");
     }
   }
+#if (BT_54)
+  else if(pEvent->hdr.event == HCI_LE_PER_ADV_SUBEVT_DATA_REQ_CBACK_EVT)
+  {
+    dmEvt_t dmMsg;
+
+    dmMsg.perAdvDataReq.advHandle = pEvent->lePerAdvSubevtDataReq.advHandle;
+    dmMsg.perAdvDataReq.subevtStart = pEvent->lePerAdvSubevtDataReq.subevtStart;
+    dmMsg.perAdvDataReq.subevtDataCnt = pEvent->lePerAdvSubevtDataReq.subevtDataCnt;
+    dmMsg.hdr.event = DM_PER_ADV_SUBEVT_DATA_REQ_IND;
+
+    /* call client callback */
+    (*dmCb.cback)(&dmMsg);
+  }
+#endif // BT_54
 }
 
 /*************************************************************************************************/
@@ -1893,6 +1983,29 @@ void DmPerAdvIncTxPwr(uint8_t advHandle, bool_t incTxPwr)
   WsfTaskUnlock();
 }
 
+#if (BT_53)
+/*************************************************************************************************/
+/*!
+ *  \brief  Set whether or not to include ADI(Adverting Data Info) in extended header of
+ *          advertising PDU for periodic advertising.
+ *
+ *  \param  advHandle    Advertising handle.
+ *  \param  incAdi     Whether to include ADI in extended header of advertising PDU (default
+ *                       value is FALSE).
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmPerAdvIncAdi(uint8_t advHandle, bool_t incAdi)
+{
+  WSF_ASSERT(advHandle < DM_NUM_ADV_SETS);
+
+  WsfTaskLock();
+  dmPerAdvCb[advHandle].incAdi = incAdi;
+  WsfTaskUnlock();
+}
+#endif // BT_53
+
 /*************************************************************************************************/
 /*!
  *  \brief  Get status of periodic advertising handle.
@@ -1969,3 +2082,94 @@ bool_t DmAdvModeExt(void)
 {
   return (dmFcnIfTbl[DM_ID_ADV] == (dmFcnIf_t *) &dmAdvFcnIf) ? TRUE : FALSE;
 }
+
+#if (BT_54)
+/*************************************************************************************************/
+/*!
+ *  \brief  Set extended advertising PHY version 2 parameters.
+ *
+ *  \param  advHandle     Advertising handle.
+ *  \param  priAdvPhy     Primary advertising Phy.
+ *  \param  secAdvMaxSkip Maximum advertising events Controller can skip before sending AUX_ADV_IND
+ *                        on secondary advertising channel (0 = AUX_ADV_IND will be sent prior to
+ *                        next advertising event).
+ *  \param  secAdvPhy     Secondary advertising Phy.
+ *  \param  priAdvPhyOpt  Primary advertising Phy Options.
+ *  \param  secAdvPhyOpt  Secondary advertising Phy Options.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmAdvSetPhyParamV2(uint8_t advHandle, uint8_t priAdvPhy, uint8_t secAdvMaxSkip, uint8_t secAdvPhy,
+                        uint8_t priAdvPhyOpt, uint8_t secAdvPhyOpt)
+{
+  WSF_ASSERT(advHandle < DM_NUM_ADV_SETS);
+
+  WsfTaskLock();
+  dmExtAdvCb[advHandle].priAdvPhy = priAdvPhy;
+  dmExtAdvCb[advHandle].secAdvMaxSkip = secAdvMaxSkip;
+  dmExtAdvCb[advHandle].secAdvPhy = secAdvPhy;
+  dmExtAdvCb[advHandle].useV2 = TRUE;
+  dmExtAdvCb[advHandle].priAdvPhyOpt = priAdvPhyOpt;
+  dmExtAdvCb[advHandle].secAdvPhyOpt = secAdvPhyOpt;
+  WsfTaskUnlock();
+}
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Set periodic advertising parameter subevent related settings.
+ *
+ *  \param  advHandle       Advertising handle.
+ *  \param  numSubEvt       Number of subevent.
+ *  \param  subEvtInt       Interval between subevents.
+ *  \param  rspSlotDelay    Time between the advertising packet in a subevent and the first
+                            response slot.
+ *  \param  rspSlotSpacing  Time between response slots.
+ *  \param  numRspSlots     Number of subevent response slots.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmAdvSetPerSbuEvtParam(uint8_t advHandle, uint8_t numSubEvt, uint8_t subEvtInt,
+                            uint8_t rspSlotDelay, uint8_t rspSlotSpacing, uint8_t numRspSlots)
+{
+  WSF_ASSERT(advHandle < DM_NUM_ADV_SETS);
+
+  WsfTaskLock();
+  dmPerAdvCb[advHandle].numSubEvents = numSubEvt;
+  dmPerAdvCb[advHandle].subEventInterval = subEvtInt;
+  dmPerAdvCb[advHandle].respSlotDelay = rspSlotDelay;
+  dmPerAdvCb[advHandle].respSlotSpacing = rspSlotSpacing;
+  dmPerAdvCb[advHandle].numRespSlots = numRspSlots;
+  WsfTaskUnlock();
+}
+
+/*************************************************************************************************/
+/*!
+ *  \brief  Set periodic advertising subevent data
+ *
+ *  \param  advHandle           Advertising handle.
+ *  \param  numSubevt           Number of subevent data
+ *  \param  subEvtData          Pointer to hciPerAdvSubEvtDataSetElem_t structure.
+ *
+ *  \return None.
+ */
+/*************************************************************************************************/
+void DmAdvSetPerAdvSbuEvtData(uint8_t advHandle, uint8_t numSubevt, hciPerAdvSubEvtDataSetElem_t *subEvtData)
+{
+//  hciPerAdvSubEvtDataSetElem_t hciSubEvtDataElem[HCI_LE_SET_SUB_EVT_DATA_NUM_MAX];
+
+  WSF_ASSERT(advHandle < DM_NUM_ADV_SETS);
+#if 0
+  for(uint8_t i=0; i<numSubevt; i++)
+  {
+    hciSubEvtDataElem[i].subEvt = subEvtData->subEvt;
+    hciSubEvtDataElem[i].rspSlotStart = subEvtData->rspSlotStart;
+    hciSubEvtDataElem[i].rspSlotCnt = subEvtData->rspSlotCnt;
+    hciSubEvtDataElem[i].subEvtDataLen = subEvtData->subEvtDataLen;
+    hciSubEvtDataElem[i].subEvtData = subEvtData->subEvtData;
+  }
+#endif
+  HciLeSetPerAdvSubEvtDataCmd(advHandle, numSubevt, subEvtData);
+}
+#endif // BT_54

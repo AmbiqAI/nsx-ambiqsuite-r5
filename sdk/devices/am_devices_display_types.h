@@ -41,7 +41,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef AM_DEVICES_DISPLAY_TYPES_H
@@ -63,7 +63,7 @@
 //! @brief The display controller IPs in Apollo SoC to drive the panel.
 //!
 //! @note DC stands for the dedicated Display Controller IP in Apollo4B/Apollo4P/Apollo5 SoC,
-//! MSPI stands for the Multi-SPI master interface IP in all Apollo series SoC.
+//! MSPI stands for the Multi-SPI controller interface IP in all Apollo series SoC.
 //! More details please refer to the corresponding datasheet.
 //! @{
 //

@@ -2,9 +2,9 @@
 //
 //! @file am_devices_sdio_rs9116.h
 //!
-//! @brief SiliconLabs RS9116 Wi-Fi device driver.
+//! @brief SDIO WiFi driver for the RS9116 module.
 //!
-//! @addtogroup RS9116 SDIO Wi-Fi Driver
+//! @addtogroup devices_sdio_rs9116 RS9116 SDIO WiFi Driver
 //! @ingroup devices
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef AM_DEVICES_SDIO_RS9116_H

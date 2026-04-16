@@ -1171,24 +1171,48 @@ void AppSlaveProcDmMsg(dmEvt_t *pMsg)
 
     case DM_REMOTE_FEATURES_IND:
     {
-        hciEvt_t *pEvent = (hciEvt_t *)pMsg;
-        uint8_t data_len_ext = pEvent->leReadRemoteFeatCmpl.features[0]&HCI_LE_SUP_FEAT_DATA_LEN_EXT;
-        APP_TRACE_INFO2("remote feature: 0x%x,  DLE:0x%x", pEvent->leReadRemoteFeatCmpl.features[0],data_len_ext);
-		if(data_len_ext == HCI_LE_SUP_FEAT_DATA_LEN_EXT)
-		{
-		    APP_TRACE_INFO0("Remote device support DLE");
-			DmConnSetDataLen(pMsg->hdr.param, LE_MAX_TX_SIZE, LE_MAX_TX_TIME);
-		}
-		else
-		{
-		   APP_TRACE_INFO0("Remote device doesn't support DLE"); 
-		}	  
-  	  /* If conn update is waiting for features, perform the conn update timeout action */
-	  if (pCb->updateState == APP_CU_STATE_WAIT_FEATURES)
-	  {
-	    appSlaveConnUpdateTimeout((wsfMsgHdr_t*) pMsg, pCb);
-	  }
-	  else
+      hciEvt_t *pEvent = (hciEvt_t *)pMsg;
+      uint8_t data_len_ext = pEvent->leReadRemoteFeatCmpl.features[0] & HCI_LE_SUP_FEAT_DATA_LEN_EXT;
+      APP_TRACE_INFO2("remote feature: 0x%x,  DLE:0x%x", pEvent->leReadRemoteFeatCmpl.features[0],data_len_ext);
+      if(data_len_ext == HCI_LE_SUP_FEAT_DATA_LEN_EXT)
+      {
+        APP_TRACE_INFO0("Remote device support DLE");
+        DmConnSetDataLen(pMsg->hdr.param, LE_MAX_TX_SIZE, LE_MAX_TX_TIME);
+      }
+      else
+      {
+        APP_TRACE_INFO0("Remote device doesn't support DLE"); 
+      }
+
+#if (BT_53)
+#if defined(BLE_SUBRATING)
+      if (pEvent->leReadRemoteFeatCmpl.features[4] & (HCI_LE_SUP_FEAT_SUBRATING >> 32))
+      {
+        APP_TRACE_INFO0("Remote device support LE Connection Subrating");
+        if (pAppSubrateCfg)
+        {
+          hciLeSubrateReq_t subrateReq;
+          subrateReq.subrateMax = pAppSubrateCfg->subrateMax;
+          subrateReq.subrateMin = pAppSubrateCfg->subrateMin;
+          subrateReq.maxLatency = pAppSubrateCfg->maxLatency;
+          subrateReq.contNum = pAppSubrateCfg->contNum;
+          subrateReq.supTimeout = pAppSubrateCfg->supTimeout;
+          DmConnSubrateReq(pMsg->hdr.param, &subrateReq);
+        }
+      }
+      else
+      {
+        APP_TRACE_INFO0("Remote device doesn't support LE Connection Subrating");
+      }
+#endif // defined(BLE_SUBRATING)
+#endif // BT_53
+
+      /* If conn update is waiting for features, perform the conn update timeout action */
+      if (pCb->updateState == APP_CU_STATE_WAIT_FEATURES)
+      {
+        appSlaveConnUpdateTimeout((wsfMsgHdr_t*) pMsg, pCb);
+      }
+      else
       {
         pCb->updateState = APP_CU_STATE_UPDATING;
       }
@@ -1198,6 +1222,19 @@ void AppSlaveProcDmMsg(dmEvt_t *pMsg)
     case DM_CONN_DATA_LEN_CHANGE_IND:
       APP_TRACE_INFO3("data length exchange, status= %d, maxRXLen= %d, maxTXlen= %d", pMsg->dataLenChange.hdr.status, pMsg->dataLenChange.maxRxOctets, pMsg->dataLenChange.maxTxOctets);
 	  break;
+
+#if (BT_53)
+    case DM_CONN_SUBRATE_CHANGE_IND:
+      APP_TRACE_INFO1("Subrate Changed, status = 0x%x", pMsg->subrateChange.status);
+      if (pMsg->subrateChange.status == 0)
+      {
+        APP_TRACE_INFO1("- Subrate Factor: %d", pMsg->subrateChange.subrateFactor);
+        APP_TRACE_INFO1("- Peripheral Latency: %d", pMsg->subrateChange.periphLatency);
+        APP_TRACE_INFO1("- Continuation number: %d", pMsg->subrateChange.contNum);
+        APP_TRACE_INFO1("- Supervision timeout: %d", pMsg->subrateChange.supTimeout);
+      }
+    break;
+#endif // BT_53
 
     case DM_HW_ERROR_IND:
       HciDrvRadioBoot(0);

@@ -2,11 +2,9 @@
 //
 //! @file am_devices_display_generic.h
 //!
-//! @brief the generic display device driver provides unified display
-//! initialization, frame-transfer operations etc via interfaces on Apollo4/Apollo5
-//! SoC, like MSPI and DC (one layer only).
+//! @brief Display Controller drivers & MSPI driver
 //!
-//! @addtogroup disp_generic Display Devices Generic Driver
+//! @addtogroup devices_display_generic Display Devices Generic Driver
 //! @ingroup devices
 //! @{
 //
@@ -46,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef AM_DEVICES_DISPLAY_GENERIC_H
@@ -69,6 +67,14 @@
 #if (DISP_CTRL_IP == DISP_CTRL_IP_MSPI)
 #include "am_devices_mspi_raydium.h"
 #endif //(DISP_CTRL_IP == DISP_CTRL_IP_MSPI)
+
+#if defined(AM_BSP_DISP_OUTPUT_MODE_TYPE)
+#if (AM_BSP_DISP_OUTPUT_MODE_TYPE == AM_BSP_DISP_DUAL_LANE_MODE)
+#include "am_devices_dc_dsi_novatek.h"
+#else
+#error "Unknown dual-lane display driver"
+#endif
+#endif
 
 #define TE_GPIO_IDX         GPIO_NUM2IDX(DISPLAY_TE_PIN)
 
@@ -274,6 +280,7 @@ uint32_t am_devices_display_flip(uint8_t ui8FlipXY);
 #endif // defined (DISP_CTRL_IP)
 
 #endif // AM_DEVICES_DISPLAY_GENERIC_H
+
 //*****************************************************************************
 //
 // End Doxygen group.

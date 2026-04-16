@@ -25,6 +25,8 @@
 #ifndef SVC_CH_H
 #define SVC_CH_H
 
+#include "cfg_stack.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -700,6 +702,37 @@ extern "C" {
 #define CH_PLF_FLAG_PULSE_AMP_SUP             0x40    /*!< \brief Pulse Amplitude Index field is supported */
 #define CH_PLF_FLAG_MULTI_BOND_SUP            0x80    /*!< \brief Multiple Bonds Supported */
 /**@}*/
+
+#if (BT_54)
+/** \name Encrypted Data Key Material
+ *
+ */
+/**@{*/
+#define CH_EDKM_KEY_LEN                       16      /*!< \brief Length of Session Key. */
+#define CH_EDKM_IV_LEN                        8       /*!< \brief Length of Initialization Vector. */
+/**@}*/
+
+/** \name LE GATT Security Levels
+ *
+ */
+/**@{*/
+#define CH_SL_MIN_LEN                         2       /*!< \brief Minimum Length of LE GATT security levels */
+#define CH_SL_MAX_LEN                         6       /*!< \brief Maximum Length of LE GATT security levels */
+#define CH_SL_SEC_MODE_1                      1       /*!< \brief LE security mode 1 */
+#define CH_SL_SEC_MODE_2                      2       /*!< \brief LE security mode 2 */
+#define CH_SL_SEC_MODE_3                      3       /*!< \brief LE security mode 3 */
+#define CH_SL_SEC_MODE_1_LEVEL_1              1       /*!< \brief LE security mode 1 level 1 */
+#define CH_SL_SEC_MODE_1_LEVEL_2              2       /*!< \brief LE security mode 1 level 2 */
+#define CH_SL_SEC_MODE_1_LEVEL_3              3       /*!< \brief LE security mode 1 level 3 */
+#define CH_SL_SEC_MODE_1_LEVEL_4              4       /*!< \brief LE security mode 1 level 4 */
+#define CH_SL_SEC_MODE_2_LEVEL_1              1       /*!< \brief LE security mode 2 level 1 */
+#define CH_SL_SEC_MODE_2_LEVEL_2              2       /*!< \brief LE security mode 2 level 2 */
+#define CH_SL_SEC_MODE_3_LEVEL_1              1       /*!< \brief LE security mode 3 level 1 */
+#define CH_SL_SEC_MODE_3_LEVEL_2              2       /*!< \brief LE security mode 3 level 2 */
+#define CH_SL_SEC_MODE_3_LEVEL_3              3       /*!< \brief LE security mode 3 level 3 */
+/**@}*/
+
+#endif // BT_54
 
 /*! \} */    /* SERVICE_CONSTANTS */
 

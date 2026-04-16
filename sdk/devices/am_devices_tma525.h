@@ -4,11 +4,11 @@
 //!
 //! @brief General I2C touch driver.
 //!
-//! @addtogroup tma525 TMA525 - I2C Touch Driver
+//! @addtogroup devices_tma525 TMA525 - I2C Touch Driver
 //! @ingroup devices
 //! @{
 //
-//**************************************************************************
+//*****************************************************************************
 
 //*****************************************************************************
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -86,9 +86,9 @@ extern "C"
 #define ENABLE                          1
 #define DISABLE                         0
 
-#define CHIP_ID_REG                     0xCC00
-#define CHIP_ID_VALUE                   0xE628
-#define TMA525_SLAVE_ADDR               0x24
+#define CHIP_ID_REG                         0xCC00
+#define CHIP_ID_VALUE                       0xE628
+#define AM_DEVICES_TMA525_PERIPHERAL_ADDR   0x24
 
 // different technique in 1.39 and 1.19
 // 1.39:Lens GFF

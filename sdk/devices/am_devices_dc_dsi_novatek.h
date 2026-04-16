@@ -2,9 +2,9 @@
 //
 //! @file am_devices_dc_dsi_novatek.h
 //!
-//! @brief Generic Novatek DSI driver.
+//! @brief Driver for Novatek display panels with DSI interface (NT38350).
 //!
-//! @addtogroup dc_dsi Novatek DC DSI Driver
+//! @addtogroup devices_dc_dsi_novatek Novatek DC DSI Driver
 //! @ingroup devices
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 

@@ -94,7 +94,7 @@ static uint8_t eattcGetFreeSlot(dmConnId_t connId, uint8_t priority, uint16_t da
         {
           if (pCcb->outReq.hdr.event == ATTC_MSG_API_NONE)
           {
-            EATT_TRACE_INFO1("eattcGetFreeSlot: allocating slot: %#x", slot);
+            EATT_TRACE_INFO1("eattcGetFreeSlot: allocating slot: %x", slot);
             return slot;
           }
         }
@@ -264,7 +264,7 @@ void eattcSendMsg(dmConnId_t connId, uint8_t priority, uint16_t handle, uint8_t 
     /* allocate message buffer */
     if ((pMsg = WsfMsgAlloc(sizeof(attcApiMsg_t))) != NULL)
     {
-      EATT_TRACE_INFO2("eattcSendMsg: sending event: %#x slot: %#x", msgId, slot);
+      EATT_TRACE_INFO2("eattcSendMsg: sending event: %x slot: %x", msgId, slot);
 
       /* set parameters */
       pMsg->hdr.param = connId;

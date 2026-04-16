@@ -2,9 +2,9 @@
 //
 //! @file am_devices_em9305.h
 //!
-//! @brief Support functions for the EM Micro EM9305 BLE radio.
+//! @brief Support functions for the EM Micro EM9305 BTLE radio
 //!
-//! @addtogroup em9305 EM9305 BLE Radio Device Driver
+//! @addtogroup devices_em9305 EM9305 BTLE Radio Device Driver
 //! @ingroup devices
 //! @{
 //
@@ -44,7 +44,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #ifndef AM_DEVICES_EM9305_H
@@ -59,6 +59,7 @@
 #define AM_BSP_EM9305_RADIO_INT_CHNL        0
 
 #endif  // !defined(AM_BSP_EM9305_SPI_MODULE)
+
 
 #define SPI_MODULE  AM_BSP_EM9305_SPI_MODULE
 
@@ -99,6 +100,21 @@
 #define UINT32_TO_BYTE3(n)        ((uint8_t) ((n) >> 24))
 #define UINT32_TO_BYTES(n)        ((uint8_t) (n)), ((uint8_t)((n) >> 8)), ((uint8_t)((n) >> 16)), ((uint8_t)((n) >> 24))
 
+//*****************************************************************************
+//
+//! Option set trim value for high frequency crystal oscillator if the value
+//! is different from recommended crystal.
+//!  AM_DEVICES_EM9305_HF_CRYSTAL_CUSTOM_TRIMS
+//!      0 = No trim and use EM's default value.
+//!      1 = Set the obtained trim value for high frequency crystal oscillator.
+//!  Default: 0x25
+//
+//*****************************************************************************
+#define AM_DEVICES_EM9305_HF_CRYSTAL_CUSTOM_TRIMS      0
+#if (AM_DEVICES_EM9305_HF_CRYSTAL_CUSTOM_TRIMS)
+// The default high frequency crystral trim value from EM9305
+#define EM9305_HF_CRYSTAL_TRIM_VALUE_DEFAULT        (0x25)
+#endif
 
 #define am_devices_em9305_buffer(A)                                                  \
     union                                                                     \
@@ -149,6 +165,8 @@
 #define HCI_VSC_READ_AT_ADDRESS_CMD_LENGTH              5
 #define HCI_VSC_WRITE_AT_ADDRESS_CMD_LENGTH             134
 #define HCI_VSC_ENTER_SLEEP_CMD_LENGTH                  0
+#define HCI_VSC_CALCULATE_TRIM_VALUE_CMD_LENGTH         1
+#define HCI_VSC_READ_PRODUCT_INFO_CMD_LENGTH            0
 
 
 
@@ -161,6 +179,9 @@ typedef enum
     HCI_VSC_WRITE_AT_ADDRESS_CMD_OPCODE              = 0xFD03,
     HCI_VSC_NVM_ERASE_NVM_MAIN_CMD_OPCODE            = 0xFD06,
     HCI_VSC_NVM_ERASE_PAGE_CMD_OPCODE                = 0xFD07,
+
+    //Vendor Specific Command read product information
+    HCI_VSC_READ_PRODUCT_INFO_CMD_OPCODE             = 0xFC01,
     //Vendor Specific Command set device public address
     HCI_VSC_SET_DEV_PUB_ADDR_CMD_OPCODE              = 0xFC43,
     //Vendor Specific Command set sleep option
@@ -173,6 +194,8 @@ typedef enum
     HCI_VSC_SET_TX_POWER_LEVEL_CMD_OPCODE            = 0xFCC4,
     //! Ambiq Vendor Specific Command trigger Apollo510 and EM9305 to enter sleep
     HCI_VSC_ENTER_SLEEP_CMD_OPCODE                   = 0xFCF0,
+    //! Ambiq Vendor Specific Command to obtain the high frequency crystal trim value
+    HCI_VSC_CALCULATE_TRIM_VALUE_CMD_OPCODE          = 0xFCF1,
     // Set local supported feature
     HCI_VSC_SET_LOCAL_SUP_FEAT_CMD_OPCODE            = 0xFFF2,
 }vsc_opcode;
@@ -284,6 +307,10 @@ bool am_devices_em9305_swap_spi_erase_page(NvmPage *pErasePage, uint8_t size);
 bool am_devices_em9305_spi_swap_version_enabled(void);
 void am_devices_em9305_set_spi_bitbang_mode(bool bitbang_mode);
 bool am_devices_em9305_spi_bitbang_enabled(void);
+uint32_t am_devices_em9305_sleep_set(void* pHandle, bool enable);
+void am_devices_em9305_shutdown(void);
+void am_devices_em9305_request_counter_set(bool bIncrement);
+uint32_t am_devices_em9305_request_counter_get(void);
 void am_devices_em9305_config_iom6_default(void);
 
 //*****************************************************************************
@@ -312,6 +339,21 @@ uint32_t am_devices_em9305_bus_enable(void* pHandle);
 //*****************************************************************************
 uint32_t am_devices_em9305_bus_disable(void* pHandle);
 
+
+//*****************************************************************************
+//
+//! @brief Set the high frequency crystal trim value based on the tested values at customer side.
+//!
+//!
+//! @param pHandle          - Pointer to device handle
+//! @param trimValue        - The new tested trim value, it's 6 bits in the register
+//                             default value is 0x25
+//! @param force_update     - Indicate if force update trim value or not
+//!
+//! @return  status from am_devices_em9305_status_t
+//
+//*****************************************************************************
+extern uint32_t am_devices_em9305_crystal_trim_set(void *pHandle, uint8_t trimValue, bool force_update);
 
 #endif // AM_DEVICES_EM9305_H
 

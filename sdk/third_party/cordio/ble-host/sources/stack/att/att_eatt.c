@@ -679,7 +679,7 @@ void EattEstablishChannels(dmConnId_t connId)
   {
     eattConnCb_t *pCcb = eattGetConnCb(connId);
 
-    EATT_TRACE_INFO1("EattEstablishChannels: connId: %#x", connId);
+    EATT_TRACE_INFO1("EattEstablishChannels: connId: %x", connId);
 
     if (pCcb)
     {

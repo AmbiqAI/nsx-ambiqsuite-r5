@@ -40,7 +40,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 #include <string.h>
@@ -129,13 +129,10 @@ static void hciCoreReadMaxDataLen(void)
 void hciCoreResetStart(void)
 {
   /* send an HCI Reset command to start the sequence */
-  HCI_TRACE_INFO0("hciCoreResetStart");
   HciResetCmd();
 
   // update Bluetooth Address to controller
-  HCI_TRACE_INFO0("hciCoreResetStart 2");
   HciVscUpdateBDAddress();
-  HCI_TRACE_INFO0("hciCoreResetStart 3");
 
 }
 
@@ -164,7 +161,7 @@ void hciCoreResetSequence(uint8_t *pMsg)
     pMsg++;                   /* skip num packets */
     BSTREAM_TO_UINT16(opcode, pMsg);
     pMsg++;                   /* skip status */
-    HCI_TRACE_INFO0("hciCoreResetSequence opcode 0x%x", opcode);
+
     /* decode opcode */
     switch (opcode)
     {

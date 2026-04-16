@@ -40,7 +40,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 //
-// This is part of revision release_sdk5p0p0-5f68a8286b of the AmbiqSuite Development Package.
+// This is part of revision release_sdk5p1p0-609aff2828 of the AmbiqSuite Development Package.
 //
 //*****************************************************************************
 
@@ -392,6 +392,16 @@ void
 HciDrvRadioShutdown(void)
 {
     BLE_HEARTBEAT_STOP();
+    
+    //
+    // decrement counter and check if we should proceed with turning off the radio
+    //
+    am_devices_em9305_request_counter_set(false);
+    if(am_devices_em9305_request_counter_get() != 0)
+    {
+        // do not power off EM9305
+        return;
+    }
 
     am_devices_em9305_disable_interrupt();
     am_devices_em9305_hsclk_req(false);//disable the EM9305 12M clock output
