@@ -28,7 +28,9 @@ source code is included. Third-party components include full source.
 
 ## Branch Model
 
-- `main` — current default R5 line for NSX (SDK 5.1.0)
+- `main` — Apollo510 default line (SDK 5.1.0)
+- `r5.2` — Apollo5B lineage (SDK R5.2.0)
+- `r5.2-alpha` — Apollo330/510L lineage (SDK R5.2.alpha.1.1)
 
 Licensing for the imported SDK content follows the upstream AmbiqSuite terms.
 See [`UPSTREAM-LICENSE-NOTICE.md`](UPSTREAM-LICENSE-NOTICE.md) for the
