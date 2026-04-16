@@ -260,6 +260,33 @@ void cdcd_init(void)
   }
 }
 
+bool cdcd_deinit(void)
+{
+#if OSAL_MUTEX_REQUIRED
+  for(uint8_t i=0; i<CFG_TUD_CDC; i++)
+  {
+    cdcd_interface_t* p_cdc = &_cdcd_itf[i];
+
+#ifndef AM_CDC_USE_APP_BUF
+    osal_mutex_t mutex_rd = p_cdc->rx_ff.mutex_rd;
+    osal_mutex_t mutex_wr = p_cdc->tx_ff.mutex_wr;
+
+    if (mutex_rd) {
+      osal_mutex_delete(mutex_rd);
+      tu_fifo_config_mutex(&p_cdc->rx_ff, NULL, NULL);
+    }
+
+    if (mutex_wr) {
+      osal_mutex_delete(mutex_wr);
+      tu_fifo_config_mutex(&p_cdc->tx_ff, NULL, NULL);
+    }
+#endif
+  }
+#endif
+
+  return true;
+}
+
 void cdcd_reset(uint8_t rhport)
 {
   (void) rhport;
